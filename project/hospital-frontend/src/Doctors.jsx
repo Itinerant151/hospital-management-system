@@ -6,6 +6,7 @@ function Doctors() {
   const [name, setName] = useState('');
   const [specialization, setSpecialization] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [editingId, setEditingId] = useState(null);
 
   useEffect(() => {
     fetchDoctors();
@@ -16,13 +17,32 @@ function Doctors() {
     setDoctors(response.data);
   };
 
-  const addDoctor = async (e) => {
-    e.preventDefault();
-    await api.post('/doctors', { name, specialization, phoneNumber });
+  const resetForm = () => {
     setName('');
     setSpecialization('');
     setPhoneNumber('');
+    setEditingId(null);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const doctorData = { name, specialization, phoneNumber };
+
+    if (editingId) {
+      await api.put(`/doctors/${editingId}`, doctorData);
+    } else {
+      await api.post('/doctors', doctorData);
+    }
+
+    resetForm();
     fetchDoctors();
+  };
+
+  const startEditing = (doctor) => {
+    setEditingId(doctor.id);
+    setName(doctor.name);
+    setSpecialization(doctor.specialization);
+    setPhoneNumber(doctor.phoneNumber);
   };
 
   const deleteDoctor = async (id) => {
@@ -34,7 +54,7 @@ function Doctors() {
     <div>
       <h2>Doctors</h2>
 
-      <form onSubmit={addDoctor}>
+      <form onSubmit={handleSubmit}>
         <input
           type="text"
           placeholder="Name"
@@ -56,7 +76,12 @@ function Doctors() {
           onChange={(e) => setPhoneNumber(e.target.value)}
           required
         />
-        <button type="submit">Add Doctor</button>
+        <button type="submit">{editingId ? 'Update Doctor' : 'Add Doctor'}</button>
+        {editingId && (
+          <button type="button" onClick={resetForm}>
+            Cancel
+          </button>
+        )}
       </form>
 
       <table border="1" cellPadding="8" style={{ marginTop: '20px' }}>
@@ -65,7 +90,7 @@ function Doctors() {
             <th>Name</th>
             <th>Specialization</th>
             <th>Phone Number</th>
-            <th>Action</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -75,6 +100,7 @@ function Doctors() {
               <td>{doctor.specialization}</td>
               <td>{doctor.phoneNumber}</td>
               <td>
+                <button onClick={() => startEditing(doctor)}>Edit</button>
                 <button onClick={() => deleteDoctor(doctor.id)}>Delete</button>
               </td>
             </tr>

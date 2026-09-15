@@ -9,6 +9,7 @@ function Patients() {
   const [gender, setGender] = useState('');
   const [diagnosis, setDiagnosis] = useState('');
   const [doctorId, setDoctorId] = useState('');
+  const [editingId, setEditingId] = useState(null);
 
   useEffect(() => {
     fetchPatients();
@@ -25,21 +26,36 @@ function Patients() {
     setDoctors(response.data);
   };
 
-  const addPatient = async (e) => {
-    e.preventDefault();
-    await api.post('/patients', {
-      name,
-      age: Number(age),
-      gender,
-      diagnosis,
-      doctorId,
-    });
+  const resetForm = () => {
     setName('');
     setAge('');
     setGender('');
     setDiagnosis('');
     setDoctorId('');
+    setEditingId(null);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const patientData = { name, age: Number(age), gender, diagnosis, doctorId };
+
+    if (editingId) {
+      await api.put(`/patients/${editingId}`, patientData);
+    } else {
+      await api.post('/patients', patientData);
+    }
+
+    resetForm();
     fetchPatients();
+  };
+
+  const startEditing = (patient) => {
+    setEditingId(patient.id);
+    setName(patient.name);
+    setAge(patient.age);
+    setGender(patient.gender);
+    setDiagnosis(patient.diagnosis);
+    setDoctorId(patient.doctorId || '');
   };
 
   const deletePatient = async (id) => {
@@ -56,7 +72,7 @@ function Patients() {
     <div>
       <h2>Patients</h2>
 
-      <form onSubmit={addPatient}>
+      <form onSubmit={handleSubmit}>
         <input
           type="text"
           placeholder="Name"
@@ -85,7 +101,7 @@ function Patients() {
           onChange={(e) => setDiagnosis(e.target.value)}
           required
         />
-        <select value={doctorId} onChange={(e) => setDoctorId(e.target.value)} required>
+        <select value={doctorId} onChange={(e) => setDoctorId(e.target.value)}>
           <option value="">Assign a doctor</option>
           {doctors.map((doctor) => (
             <option key={doctor.id} value={doctor.id}>
@@ -93,7 +109,12 @@ function Patients() {
             </option>
           ))}
         </select>
-        <button type="submit">Add Patient</button>
+        <button type="submit">{editingId ? 'Update Patient' : 'Add Patient'}</button>
+        {editingId && (
+          <button type="button" onClick={resetForm}>
+            Cancel
+          </button>
+        )}
       </form>
 
       <table border="1" cellPadding="8" style={{ marginTop: '20px' }}>
@@ -104,7 +125,7 @@ function Patients() {
             <th>Gender</th>
             <th>Diagnosis</th>
             <th>Doctor</th>
-            <th>Action</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -113,7 +134,7 @@ function Patients() {
               <td>{patient.name}</td>
               <td>{patient.age}</td>
               <td>{patient.gender}</td>
-              <td>{patient.diagnosis}</td>
+              <td>{patient.diagnosis || '(none)'}</td>
               <td>
                 <select
                   value={patient.doctorId || ''}
@@ -128,6 +149,7 @@ function Patients() {
                 </select>
               </td>
               <td>
+                <button onClick={() => startEditing(patient)}>Edit</button>
                 <button onClick={() => deletePatient(patient.id)}>Delete</button>
               </td>
             </tr>

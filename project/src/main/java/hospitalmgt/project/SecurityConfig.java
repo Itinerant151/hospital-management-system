@@ -51,13 +51,19 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/login", "/signup").permitAll()
 
-                        // PATIENT and DOCTOR can both VIEW doctors (needed for dropdowns),
-                        // but only DOCTOR/ADMIN can create/edit/delete doctors
                         .requestMatchers(HttpMethod.GET, "/doctors/**").hasAnyRole("DOCTOR", "PATIENT", "ADMIN")
                         .requestMatchers("/doctors/**").hasAnyRole("DOCTOR", "ADMIN")
 
-                        // PATIENT and ADMIN can fully manage patients/appointments
-                        .requestMatchers("/patients/**", "/appointments/**").hasAnyRole("PATIENT", "ADMIN")
+                        .requestMatchers("/patients/me").hasAnyRole("PATIENT", "ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/patients/by-doctor/**").hasAnyRole("DOCTOR", "ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/patients/*/diagnosis").hasAnyRole("DOCTOR", "ADMIN")
+                        .requestMatchers("/patients/**").hasRole("ADMIN")
+
+                        .requestMatchers(HttpMethod.GET, "/appointments/availability").hasAnyRole("PATIENT", "DOCTOR", "ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/appointments/mine").hasAnyRole("PATIENT", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/appointments").hasAnyRole("PATIENT", "ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/appointments/**").hasAnyRole("PATIENT", "ADMIN")
+                        .requestMatchers("/appointments/**").hasRole("ADMIN")
 
                         .anyRequest().hasRole("ADMIN")
                 )

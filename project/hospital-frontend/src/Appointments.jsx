@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import api from './api';
 
+const TIME_SLOTS = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
+
 function Appointments() {
   const [appointments, setAppointments] = useState([]);
   const [patients, setPatients] = useState([]);
@@ -8,15 +10,26 @@ function Appointments() {
 
   const [patientId, setPatientId] = useState('');
   const [doctorId, setDoctorId] = useState('');
-  const [appointmentDate, setAppointmentDate] = useState('');
+  const [date, setDate] = useState('');
+  const [time, setTime] = useState('');
   const [reason, setReason] = useState('');
   const [status, setStatus] = useState('Scheduled');
+  const [bookedTimes, setBookedTimes] = useState([]);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     fetchAppointments();
     fetchPatients();
     fetchDoctors();
   }, []);
+
+  useEffect(() => {
+    if (doctorId && date) {
+      fetchAvailability();
+    } else {
+      setBookedTimes([]);
+    }
+  }, [doctorId, date]);
 
   const fetchAppointments = async () => {
     const response = await api.get('/appointments');
@@ -33,25 +46,43 @@ function Appointments() {
     setDoctors(response.data);
   };
 
+  const fetchAvailability = async () => {
+    const response = await api.get('/appointments/availability', {
+      params: { doctorId, date },
+    });
+    setBookedTimes(response.data);
+  };
+
   const addAppointment = async (e) => {
     e.preventDefault();
-    await api.post('/appointments', {
-      patientId,
-      doctorId,
-      appointmentDate,
-      reason,
-      status,
-    });
-    setPatientId('');
-    setDoctorId('');
-    setAppointmentDate('');
-    setReason('');
-    setStatus('Scheduled');
-    fetchAppointments();
+    setError('');
+    try {
+      await api.post('/appointments', {
+        patientId,
+        doctorId,
+        appointmentDate: `${date}T${time}`,
+        reason,
+        status,
+      });
+      setPatientId('');
+      setDoctorId('');
+      setDate('');
+      setTime('');
+      setReason('');
+      setStatus('Scheduled');
+      fetchAppointments();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Could not book appointment. That time may already be taken.');
+    }
   };
 
   const deleteAppointment = async (id) => {
     await api.delete(`/appointments/${id}`);
+    fetchAppointments();
+  };
+
+  const updateStatus = async (id, newStatus) => {
+    await api.put(`/appointments/${id}/status`, { status: newStatus });
     fetchAppointments();
   };
 
@@ -79,7 +110,11 @@ function Appointments() {
           ))}
         </select>
 
-        <select value={doctorId} onChange={(e) => setDoctorId(e.target.value)} required>
+        <select
+          value={doctorId}
+          onChange={(e) => { setDoctorId(e.target.value); setTime(''); }}
+          required
+        >
           <option value="">Select Doctor</option>
           {doctors.map((doctor) => (
             <option key={doctor.id} value={doctor.id}>
@@ -89,11 +124,25 @@ function Appointments() {
         </select>
 
         <input
-          type="datetime-local"
-          value={appointmentDate}
-          onChange={(e) => setAppointmentDate(e.target.value)}
+          type="date"
+          value={date}
+          onChange={(e) => { setDate(e.target.value); setTime(''); }}
           required
         />
+
+        <select
+          value={time}
+          onChange={(e) => setTime(e.target.value)}
+          required
+          disabled={!doctorId || !date}
+        >
+          <option value="">Select Time</option>
+          {TIME_SLOTS.map((slot) => (
+            <option key={slot} value={slot} disabled={bookedTimes.includes(slot)}>
+              {slot} {bookedTimes.includes(slot) ? '(Booked)' : ''}
+            </option>
+          ))}
+        </select>
 
         <input
           type="text"
@@ -111,6 +160,7 @@ function Appointments() {
 
         <button type="submit">Book Appointment</button>
       </form>
+      {error && <p style={{ color: 'red' }}>{error}</p>}
 
       <table border="1" cellPadding="8" style={{ marginTop: '20px' }}>
         <thead>
@@ -130,7 +180,16 @@ function Appointments() {
               <td>{getDoctorName(appt.doctorId)}</td>
               <td>{appt.appointmentDate}</td>
               <td>{appt.reason}</td>
-              <td>{appt.status}</td>
+              <td>
+                <select
+                  value={appt.status}
+                  onChange={(e) => updateStatus(appt.id, e.target.value)}
+                >
+                  <option value="Scheduled">Scheduled</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Cancelled">Cancelled</option>
+                </select>
+              </td>
               <td>
                 <button onClick={() => deleteAppointment(appt.id)}>Delete</button>
               </td>

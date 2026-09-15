@@ -5,6 +5,11 @@ function Signup({ onSignupSuccess }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('PATIENT');
+  const [name, setName] = useState('');
+  const [age, setAge] = useState('');
+  const [gender, setGender] = useState('');
+  const [specialization, setSpecialization] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -14,10 +19,27 @@ function Signup({ onSignupSuccess }) {
     setSuccess('');
 
     try {
-      await api.post('/signup', { username, password, role });
+      const body = { username, password, role };
+      if (role === 'PATIENT') {
+        body.name = name;
+        body.age = age;
+        body.gender = gender;
+      }
+      if (role === 'DOCTOR') {
+        body.name = name;
+        body.specialization = specialization;
+        body.phoneNumber = phoneNumber;
+      }
+
+      await api.post('/signup', body);
       setSuccess('Account created! You can now log in.');
       setUsername('');
       setPassword('');
+      setName('');
+      setAge('');
+      setGender('');
+      setSpecialization('');
+      setPhoneNumber('');
     } catch (err) {
       setError(err.response?.data?.message || 'Signup failed');
     }
@@ -44,10 +66,69 @@ function Signup({ onSignupSuccess }) {
         />
         <br />
         <select value={role} onChange={(e) => setRole(e.target.value)}>
-          <option value="PATIENT">Patients Page Staff</option>
-          <option value="DOCTOR">Doctors Page Staff</option>
+          <option value="PATIENT">Patient</option>
+          <option value="DOCTOR">Doctor</option>
         </select>
         <br />
+
+        {role === 'PATIENT' && (
+          <>
+            <input
+              type="text"
+              placeholder="Full Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
+            <br />
+            <input
+              type="number"
+              placeholder="Age"
+              value={age}
+              onChange={(e) => setAge(e.target.value)}
+              required
+            />
+            <br />
+            <input
+              type="text"
+              placeholder="Gender"
+              value={gender}
+              onChange={(e) => setGender(e.target.value)}
+              required
+            />
+            <br />
+          </>
+        )}
+
+        {role === 'DOCTOR' && (
+          <>
+            <input
+              type="text"
+              placeholder="Full Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
+            <br />
+            <input
+              type="text"
+              placeholder="Specialization"
+              value={specialization}
+              onChange={(e) => setSpecialization(e.target.value)}
+              required
+            />
+            <br />
+            <input
+              type="text"
+              placeholder="Phone Number"
+              value={phoneNumber}
+              onChange={(e) => setPhoneNumber(e.target.value)}
+              required
+            />
+            <br />
+          </>
+        )}
+
         <button type="submit">Sign Up</button>
       </form>
       {error && <p style={{ color: 'red' }}>{error}</p>}

@@ -2,6 +2,9 @@ package hospitalmgt.project;
 
 import org.springframework.data.mongodb.repository.MongoRepository;
 
-public interface AppointmentRepository extends MongoRepository<Appointment, String> {
+import java.util.List;
 
+public interface AppointmentRepository extends MongoRepository<Appointment, String> {
+    List<Appointment> findByPatientId(String patientId);
+    List<Appointment> findByDoctorId(String doctorId);
 }

@@ -32,4 +32,11 @@ public class DoctorController {
         doctorRepository.deleteById(id);
         return "Doctor deleted successfully";
     }
+
+    // Full update of any field on any doctor
+    @PutMapping("/{id}")
+    public Doctor updateDoctor(@PathVariable String id, @RequestBody Doctor doctor) {
+        doctor.setId(id);
+        return doctorRepository.save(doctor);
+    }
 }

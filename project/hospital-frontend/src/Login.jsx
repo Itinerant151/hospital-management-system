@@ -12,11 +12,12 @@ function Login({ onLoginSuccess, onShowSignup }) {
 
     try {
       const response = await api.post('/login', { username, password });
-      const { token, role } = response.data;
-      console.log('LOGIN RESPONSE ROLE:', role);
+      const { token, role, patientId, doctorId } = response.data;
 
       localStorage.setItem('token', token);
       localStorage.setItem('role', role);
+      if (patientId) localStorage.setItem('patientId', patientId);
+      if (doctorId) localStorage.setItem('doctorId', doctorId);
 
       onLoginSuccess(role);
     } catch (err) {

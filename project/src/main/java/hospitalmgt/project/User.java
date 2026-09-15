@@ -9,8 +9,10 @@ public class User {
     @Id
     private String id;
     private String username;
-    private String password; // stored hashed, never plain text
-    private String role; // e.g. "ADMIN"
+    private String password;
+    private String role;
+    private String patientId;
+    private String doctorId;
 
     public User() {}
 
@@ -28,4 +30,8 @@ public class User {
     public void setPassword(String password) { this.password = password; }
     public String getRole() { return role; }
     public void setRole(String role) { this.role = role; }
+    public String getPatientId() { return patientId; }
+    public void setPatientId(String patientId) { this.patientId = patientId; }
+    public String getDoctorId() { return doctorId; }
+    public void setDoctorId(String doctorId) { this.doctorId = doctorId; }
 }
