@@ -1,4 +1,5 @@
 package hospitalmgt.project;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -35,5 +36,12 @@ public class PatientController {
     public String deletePatient(@PathVariable String id) {
         patientRepository.deleteById(id);
         return "Patient deleted successfully";
+    }
+    // Assign or change a patient's doctor
+    @PutMapping("/{id}/assign-doctor")
+    public Patient assignDoctor(@PathVariable String id, @RequestBody Map<String, String> body) {
+        Patient patient = patientRepository.findById(id).orElseThrow();
+        patient.setDoctorId(body.get("doctorId"));
+        return patientRepository.save(patient);
     }
 }

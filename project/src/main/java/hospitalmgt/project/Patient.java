@@ -3,8 +3,6 @@ package hospitalmgt.project;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-
-
 @Document(collection = "patients")
 public class Patient {
 
@@ -15,16 +13,18 @@ public class Patient {
     private int age;
     private String gender;
     private String diagnosis;
+    private String doctorId;
 
     // Constructors
     public Patient() {
     }
 
-    public Patient(String name, int age, String gender, String diagnosis) {
+    public Patient(String name, int age, String gender, String diagnosis, String doctorId) {
         this.name = name;
         this.age = age;
         this.gender = gender;
         this.diagnosis = diagnosis;
+        this.doctorId = doctorId;
     }
 
     // Getters and Setters
@@ -66,5 +66,13 @@ public class Patient {
 
     public void setDiagnosis(String diagnosis) {
         this.diagnosis = diagnosis;
+    }
+
+    public String getDoctorId() {
+        return doctorId;
+    }
+
+    public void setDoctorId(String doctorId) {
+        this.doctorId = doctorId;
     }
 }
