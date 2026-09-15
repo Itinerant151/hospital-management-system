@@ -1,9 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
-
-const APPOINTMENTS_URL = 'http://localhost:8080/appointments';
-const PATIENTS_URL = 'http://localhost:8080/patients';
-const DOCTORS_URL = 'http://localhost:8080/doctors';
+import api from './api';
 
 function Appointments() {
   const [appointments, setAppointments] = useState([]);
@@ -23,23 +19,23 @@ function Appointments() {
   }, []);
 
   const fetchAppointments = async () => {
-    const response = await axios.get(APPOINTMENTS_URL);
+    const response = await api.get('/appointments');
     setAppointments(response.data);
   };
 
   const fetchPatients = async () => {
-    const response = await axios.get(PATIENTS_URL);
+    const response = await api.get('/patients');
     setPatients(response.data);
   };
 
   const fetchDoctors = async () => {
-    const response = await axios.get(DOCTORS_URL);
+    const response = await api.get('/doctors');
     setDoctors(response.data);
   };
 
   const addAppointment = async (e) => {
     e.preventDefault();
-    await axios.post(APPOINTMENTS_URL, {
+    await api.post('/appointments', {
       patientId,
       doctorId,
       appointmentDate,
@@ -55,7 +51,7 @@ function Appointments() {
   };
 
   const deleteAppointment = async (id) => {
-    await axios.delete(`${APPOINTMENTS_URL}/${id}`);
+    await api.delete(`/appointments/${id}`);
     fetchAppointments();
   };
 

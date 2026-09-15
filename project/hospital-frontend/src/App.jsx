@@ -1,26 +1,60 @@
-import { useState } from 'react';
-import Patients from './Patients';
-import Doctors from './Doctors';
-import Appointments from './Appointments';
+import { useState, useEffect } from 'react';
+import Login from './Login';
+import Signup from './Signup';
+import AdminPage from './AdminPage';
+import PatientPage from './PatientPage';
+import DoctorPage from './DoctorPage';
 
 function App() {
-  const [activeTab, setActiveTab] = useState('patients');
+  const [role, setRole] = useState(null);
+  const [showSignup, setShowSignup] = useState(false);
 
-  return (
-    <div style={{ padding: '20px' }}>
-      <h1>Hospital Management System</h1>
+  useEffect(() => {
+    const storedRole = localStorage.getItem('role');
+    if (storedRole) {
+      setRole(storedRole);
+    }
+  }, []);
 
-      <nav style={{ marginBottom: '20px' }}>
-        <button onClick={() => setActiveTab('patients')}>Patients</button>
-        <button onClick={() => setActiveTab('doctors')}>Doctors</button>
-        <button onClick={() => setActiveTab('appointments')}>Appointments</button>
-      </nav>
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('role');
+    setRole(null);
+  };
 
-      {activeTab === 'patients' && <Patients />}
-      {activeTab === 'doctors' && <Doctors />}
-      {activeTab === 'appointments' && <Appointments />}
-    </div>
-  );
+  const handleLoginSuccess = (newRole) => {
+    setRole(newRole);
+  };
+
+  // Not logged in: show Login or Signup
+  if (!role) {
+    if (showSignup) {
+      return <Signup onSignupSuccess={() => setShowSignup(false)} />;
+    }
+    return (
+      <Login
+        onLoginSuccess={handleLoginSuccess}
+        onShowSignup={() => setShowSignup(true)}
+      />
+    );
+  }
+
+  // Logged in: show the correct page based on role
+  if (role === 'ADMIN') {
+    return <AdminPage onLogout={handleLogout} />;
+  }
+
+  if (role === 'PATIENT') {
+    return <PatientPage onLogout={handleLogout} />;
+  }
+
+  if (role === 'DOCTOR') {
+    return <DoctorPage onLogout={handleLogout} />;
+  }
+
+  // Fallback: unrecognized role, force logout
+  handleLogout();
+  return null;
 }
 
 export default App;

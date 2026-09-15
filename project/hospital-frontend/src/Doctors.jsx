@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
-
-const API_URL = 'http://localhost:8080/doctors';
+import api from './api';
 
 function Doctors() {
   const [doctors, setDoctors] = useState([]);
@@ -14,13 +12,13 @@ function Doctors() {
   }, []);
 
   const fetchDoctors = async () => {
-    const response = await axios.get(API_URL);
+    const response = await api.get('/doctors');
     setDoctors(response.data);
   };
 
   const addDoctor = async (e) => {
     e.preventDefault();
-    await axios.post(API_URL, { name, specialization, phoneNumber });
+    await api.post('/doctors', { name, specialization, phoneNumber });
     setName('');
     setSpecialization('');
     setPhoneNumber('');
@@ -28,7 +26,7 @@ function Doctors() {
   };
 
   const deleteDoctor = async (id) => {
-    await axios.delete(`${API_URL}/${id}`);
+    await api.delete(`/doctors/${id}`);
     fetchDoctors();
   };
 

@@ -1,8 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
-
-const PATIENTS_URL = 'http://localhost:8080/patients';
-const DOCTORS_URL = 'http://localhost:8080/doctors';
+import api from './api';
 
 function Patients() {
   const [patients, setPatients] = useState([]);
@@ -19,18 +16,18 @@ function Patients() {
   }, []);
 
   const fetchPatients = async () => {
-    const response = await axios.get(PATIENTS_URL);
+    const response = await api.get('/patients');
     setPatients(response.data);
   };
 
   const fetchDoctors = async () => {
-    const response = await axios.get(DOCTORS_URL);
+    const response = await api.get('/doctors');
     setDoctors(response.data);
   };
 
   const addPatient = async (e) => {
     e.preventDefault();
-    await axios.post(PATIENTS_URL, {
+    await api.post('/patients', {
       name,
       age: Number(age),
       gender,
@@ -46,12 +43,12 @@ function Patients() {
   };
 
   const deletePatient = async (id) => {
-    await axios.delete(`${PATIENTS_URL}/${id}`);
+    await api.delete(`/patients/${id}`);
     fetchPatients();
   };
 
   const assignDoctor = async (patientId, newDoctorId) => {
-    await axios.put(`${PATIENTS_URL}/${patientId}/assign-doctor`, { doctorId: newDoctorId });
+    await api.put(`/patients/${patientId}/assign-doctor`, { doctorId: newDoctorId });
     fetchPatients();
   };
 
