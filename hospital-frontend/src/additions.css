@@ -1,0 +1,248 @@
+/* MediCore additions: imported after index.css in main.jsx, so these rules win. */
+
+/* ---------- Sidebar: its own colours, so dark mode can never wash it out ---------- */
+
+.sidebar {
+  --sb-bg: #0d2f3d;
+  --sb-hover: #174a5e;
+  --sb-active: #1c5a72;
+  --sb-line: #2a5a72;
+  --sb-text: #d6e6ed;
+  --sb-muted: #a9c3cf;
+  --sb-accent: #3fd6bf;
+
+  background: var(--sb-bg);
+  color: var(--sb-text);
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+:root[data-theme='dark'] .sidebar {
+  --sb-bg: #081419;
+  --sb-hover: #12303b;
+  --sb-active: #184152;
+  --sb-line: #1f4352;
+  border-right: 1px solid #1f4352;
+}
+
+.sidebar .brand,
+.sidebar .brand-name {
+  color: #ffffff;
+}
+
+.sidebar .brand-sub {
+  color: var(--sb-muted);
+}
+
+/* The menu takes the free space and scrolls when it is too long for the screen */
+.nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sb-line) transparent;
+}
+
+.nav::-webkit-scrollbar {
+  width: 6px;
+}
+
+.nav::-webkit-scrollbar-thumb {
+  background: var(--sb-line);
+  border-radius: 6px;
+}
+
+.nav-item {
+  color: var(--sb-text);
+  flex-shrink: 0;
+}
+
+.nav-item:hover {
+  background: var(--sb-hover);
+  color: #ffffff;
+}
+
+.nav-item.is-active {
+  background: var(--sb-active);
+  color: #ffffff;
+  font-weight: 700;
+  border-left-color: var(--sb-accent);
+}
+
+/* The footer always stays visible at the bottom */
+.sidebar-foot {
+  flex-shrink: 0;
+  margin-top: 12px;
+  border-top: 1px solid var(--sb-line);
+}
+
+.role-line {
+  color: var(--sb-muted);
+}
+
+.role-line strong {
+  color: #ffffff;
+}
+
+.sidebar .theme-toggle,
+.sidebar .btn-signout {
+  background: transparent;
+  color: #ffffff;
+  border: 1px solid var(--sb-line);
+}
+
+.sidebar .theme-toggle:hover,
+.sidebar .btn-signout:hover {
+  background: var(--sb-hover);
+  color: #ffffff;
+}
+
+@media (max-width: 820px) {
+  .sidebar {
+    height: auto;
+    overflow: visible;
+  }
+
+  .nav {
+    flex: 1 1 100%;
+    overflow-y: visible;
+    overflow-x: auto;
+  }
+
+  .sidebar-foot {
+    flex: 0 0 auto;
+    margin-top: 0;
+    border-top: 0;
+  }
+}
+
+/* ---------- Confirm dialog title ---------- */
+
+.confirm-title {
+  font-size: 1.15rem;
+  margin-bottom: 8px;
+}
+
+.confirm-box p {
+  margin: 0;
+}
+
+/* ---------- Check-in pills ---------- */
+
+.pill {
+  display: inline-block;
+  padding: 2px 11px;
+  border-radius: 999px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.pill-in {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+
+.pill-out {
+  background: var(--info-bg);
+  color: var(--info);
+}
+
+/* ---------- "Give this patient an account?" card ---------- */
+
+.prompt-card {
+  border-left: 4px solid var(--teal);
+}
+
+
+/* Dark mode: hovered content controls use black text. */
+:root[data-theme='dark'] .btn-quiet:hover,
+:root[data-theme='dark'] .btn-danger:hover,
+:root[data-theme='dark'] .chip:hover,
+:root[data-theme='dark'] .link-btn:hover {
+  color: #000000;
+}
+
+:root[data-theme='dark'] .btn-primary:hover {
+  color: #000000;
+}
+
+/* Keep sidebar navigation readable. */
+:root[data-theme='dark'] .nav-item:hover,
+:root[data-theme='dark'] .nav-item.is-active,
+:root[data-theme='dark'] .sidebar .theme-toggle:hover,
+:root[data-theme='dark'] .sidebar .btn-signout:hover {
+  color: #ffffff;
+}
+
+/* ---------- Inline diagnosis editor ---------- */
+
+.diagnosis-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 220px;
+}
+
+.diagnosis-editor textarea {
+  width: 100%;
+  min-width: 220px;
+  min-height: 70px;
+  resize: vertical;
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+/* ---------- HMO payment ---------- */
+
+.hmo-payment {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  min-width: 220px;
+}
+
+.hmo-payment input {
+  min-height: 34px;
+  padding: 6px 9px;
+}
+
+.hmo-payment-card {
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.payment-actions {
+  flex-wrap: wrap;
+}
+
+/* ---------- Temporary password notice ---------- */
+
+:root[data-theme='dark'] .alert-warning {
+  background: #3b3214;
+  color: #ffe58a;
+  border: 1px solid #6b5a20;
+}
+
+/* ---------- Partial HMO payment ---------- */
+
+.badge-partial {
+  background: #fff1cc;
+  color: #7a5200;
+}
+
+:root[data-theme='dark'] .badge-partial {
+  background: #493b16;
+  color: #ffe08a;
+}
