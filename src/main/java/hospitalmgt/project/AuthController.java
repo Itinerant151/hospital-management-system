@@ -1,5 +1,6 @@
 package hospitalmgt.project;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
@@ -26,20 +27,30 @@ public class AuthController {
     private JwtUtil jwtUtil;
 
     @PostMapping("/login")
-    public Map<String, String> login(@RequestBody Map<String, String> body) {
+    public Map<String, String> login(@RequestBody Map<String, String> body, HttpServletRequest request) {
         String username = body.get("username");
         String password = body.get("password");
 
         User user = username == null ? null : userRepository.findByUsername(username.trim());
 
         if (user == null || password == null || !passwordEncoder.matches(password, user.getPassword())) {
+            request.setAttribute("auditActor", username == null || username.isBlank() ? "unknown" : username.trim());
+            request.setAttribute("auditDetail", "Failed login attempt");
+            request.setAttribute("auditAlways", true);
             throw new ApiException(401, "Invalid username or password");
         }
         if (!user.isApproved()) {
+            request.setAttribute("auditActor", user.getUsername());
+            request.setAttribute("auditDetail", "Login blocked: receptionist application not approved yet");
+            request.setAttribute("auditAlways", true);
             throw new ApiException(403, "Your receptionist application is awaiting admin approval.");
         }
 
         String token = jwtUtil.generateToken(user.getUsername(), user.getRole(), user.getPatientId(), user.getDoctorId());
+
+        request.setAttribute("auditActor", user.getUsername());
+        request.setAttribute("auditRole", user.getRole());
+        request.setAttribute("auditDetail", "Logged in");
 
         Map<String, String> result = new HashMap<>();
         result.put("token", token);
@@ -50,7 +61,7 @@ public class AuthController {
     }
 
     @PostMapping("/signup")
-    public String signup(@RequestBody Map<String, String> body) {
+    public String signup(@RequestBody Map<String, String> body, HttpServletRequest request) {
         String role = body.get("role");
         if (role == null || (!role.equals("DOCTOR") && !role.equals("PATIENT") && !role.equals("RECEPTIONIST"))) {
             throw new ApiException(400, "Invalid role for signup");
@@ -138,6 +149,13 @@ public class AuthController {
         }
 
         userRepository.save(user);
+
+        request.setAttribute("auditActor", username);
+        request.setAttribute("auditRole", role);
+        request.setAttribute("auditDetail", role.equals("RECEPTIONIST")
+                ? "Receptionist application submitted"
+                : "Account created (" + role.toLowerCase() + ")");
+
         return role.equals("RECEPTIONIST")
                 ? "Receptionist application submitted. An administrator must approve it before you can log in."
                 : "Account created successfully";

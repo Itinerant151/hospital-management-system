@@ -3,6 +3,8 @@ import api from './api';
 import PatientDetailsForm from './PatientDetailsForm';
 import PasswordField from './PasswordField';
 import { formatNaira } from './currency';
+import Receipt from './Receipt';
+import { statusBadge, statusLabel, claimLabel, lastReceipt } from './billingHelpers';
 
 const EMPTY_ACCOUNT = { username: '', email: '', password: '' };
 
@@ -14,6 +16,7 @@ function EmergencyPatients() {
   const [visits, setVisits] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [message, setMessage] = useState('');
+  const [receipt, setReceipt] = useState(null); // { billId, payment }
 
   // Account offer: step is 'closed', 'ask' (Yes / Not now) or 'form' (username, email, password)
   const [accountInfo, setAccountInfo] = useState(null);
@@ -80,9 +83,9 @@ function EmergencyPatients() {
     setAccountError('');
     try {
       await api.post(`/patients/${accountTarget.id}/account`, accountForm);
-      setAccountInfo({ hasAccount: true, username: accountForm.username });
+      setAccountInfo({ hasAccount: true, username: accountForm.username, temporaryPassword: true });
       setMessage(
-        `Account created for ${accountTarget.name}. Username: ${accountForm.username}. Give the patient the temporary password you set.`
+        `Account created for ${accountTarget.name}. Username: ${accountForm.username}. Give the patient the temporary password you set. They will be asked to change it when they first log in.`
       );
       setAccountStep('closed');
       setAccountForm(EMPTY_ACCOUNT);
@@ -94,9 +97,11 @@ function EmergencyPatients() {
     }
   };
 
-  const markPaid = async (id) => {
-    await api.post(`/api/bills/${id}/pay`);
-    openRecord(selected);
+  // Takes the whole remaining balance in cash, then shows the receipt
+  const payBalance = async (bill) => {
+    const response = await api.post(`/api/bills/${bill.id}/pay`, { method: 'Cash' });
+    await openRecord(selected);
+    setReceipt({ billId: response.data.id, payment: lastReceipt(response.data) });
   };
 
   return (
@@ -207,6 +212,14 @@ function EmergencyPatients() {
               <p className="muted">
                 Hospital ID: {selected.id} ·{' '}
                 {accountInfo?.hasAccount ? `Has an account (${accountInfo.username})` : 'Emergency / no account'}
+                {accountInfo?.hasAccount && (
+                  <>
+                    {' '}·{' '}
+                    {accountInfo.temporaryPassword
+                      ? <span className="badge badge-partial">Temporary password: not changed yet</span>
+                      : <span className="badge badge-completed">Password set by the patient</span>}
+                  </>
+                )}
               </p>
             </div>
             <div className="row-actions">
@@ -230,9 +243,23 @@ function EmergencyPatients() {
               </div>
 
               <div className="list-head" style={{ marginTop: '24px' }}><h3>Payment status</h3></div>
-              <div className="table-wrap"><table><thead><tr><th>Bill</th><th>Total</th><th>Status</th><th>Action</th></tr></thead><tbody>
-                {bills.length === 0 && <tr><td className="empty" colSpan="4">No bills for this patient.</td></tr>}
-                {bills.map((bill) => <tr key={bill.id}><td>{bill.items?.map((item) => item.description).join(', ')}</td><td>{formatNaira(bill.total)}</td><td>{bill.status}</td><td>{bill.status !== 'PAID' && (role === 'ADMIN' || role === 'RECEPTIONIST') && <button className="btn btn-primary btn-sm" onClick={() => markPaid(bill.id)}>Mark as paid</button>}</td></tr>)}
+              <div className="table-wrap"><table><thead><tr><th>Bill</th><th>Total</th><th>HMO</th><th>Balance</th><th>Status</th><th>Action</th></tr></thead><tbody>
+                {bills.length === 0 && <tr><td className="empty" colSpan="6">No bills for this patient.</td></tr>}
+                {bills.map((bill) => (
+                  <tr key={bill.id}>
+                    <td>{bill.items?.map((item) => item.description).join(', ')}</td>
+                    <td>{formatNaira(bill.total)}</td>
+                    <td>{bill.hmoCoveredAmount > 0 ? `${bill.hmoProvider}: ${formatNaira(bill.hmoCoveredAmount)} (${claimLabel(bill.claimStatus)})` : <span className="muted">None</span>}</td>
+                    <td>{formatNaira(bill.balance)}</td>
+                    <td><span className={statusBadge(bill.status)}>{statusLabel(bill.status)}</span></td>
+                    <td>
+                      <div className="row-actions">
+                        {bill.balance > 0 && (role === 'ADMIN' || role === 'RECEPTIONIST') && <button className="btn btn-primary btn-sm" onClick={() => payBalance(bill)}>Pay balance</button>}
+                        {lastReceipt(bill) && <button className="btn btn-quiet btn-sm" onClick={() => setReceipt({ billId: bill.id, payment: lastReceipt(bill) })}>Receipt</button>}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
               </tbody></table></div>
 
               <div className="list-head" style={{ marginTop: '24px' }}><h3>Visitations</h3></div>
@@ -244,6 +271,7 @@ function EmergencyPatients() {
           )}
         </section>
       )}
+      {receipt && <Receipt billId={receipt.billId} paymentNumber={receipt.payment} onClose={() => setReceipt(null)} />}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 package hospitalmgt.project;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -38,12 +39,13 @@ public class PasswordResetController {
     }
 
     @PostMapping("/forgot-password")
-    public Map<String, String> forgotPassword(@RequestBody Map<String, String> body) {
+    public Map<String, String> forgotPassword(@RequestBody Map<String, String> body, HttpServletRequest request) {
         String identifier = body.get("identifier");
         if (identifier == null || identifier.isBlank()) {
             throw new ApiException(400, "Enter your username or email.");
         }
         identifier = identifier.trim();
+        request.setAttribute("auditDetail", "Password reset link requested for " + identifier);
 
         User user = userRepository.findByUsername(identifier);
         if (user == null) {
@@ -67,7 +69,7 @@ public class PasswordResetController {
     }
 
     @PostMapping("/reset-password")
-    public Map<String, String> resetPassword(@RequestBody Map<String, String> body) {
+    public Map<String, String> resetPassword(@RequestBody Map<String, String> body, HttpServletRequest request) {
         String token = body.get("token");
         String newPassword = body.get("newPassword");
 
@@ -89,7 +91,12 @@ public class PasswordResetController {
         }
 
         user.setPassword(passwordEncoder.encode(newPassword));
+        // A reset means the person chose this password themselves, so it is no longer a temporary one
+        user.setTemporaryPassword(false);
         userRepository.save(user);
+        request.setAttribute("auditActor", user.getUsername());
+        request.setAttribute("auditRole", user.getRole());
+        request.setAttribute("auditDetail", "Password reset completed");
         tokenRepository.deleteByUserId(user.getId());
 
         return Map.of("message", "Password updated. You can now log in.");

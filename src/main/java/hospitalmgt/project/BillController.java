@@ -1,12 +1,16 @@
 package hospitalmgt.project;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import jakarta.servlet.http.HttpServletRequest;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -14,8 +18,14 @@ import java.util.UUID;
 @RequestMapping("/api/bills")
 public class BillController {
 
+    private static final List<String> METHODS = List.of("Cash", "Card", "Bank Transfer", "Demo");
+    private static final List<String> CLAIM_STATUSES = List.of("PENDING", "APPROVED", "PARTIALLY_APPROVED", "REJECTED");
+
     @Autowired
     private BillRepository billRepository;
+
+    @Autowired
+    private PatientRepository patientRepository;
 
     @GetMapping
     public List<Bill> getAll() {
@@ -23,21 +33,20 @@ public class BillController {
     }
 
     @GetMapping("/patient/{patientId}")
-    public List<Bill> getByPatient(@PathVariable String patientId) {
+    public List<Bill> getByPatient(@PathVariable String patientId, HttpServletRequest request) {
+        if ("PATIENT".equals(request.getAttribute("role"))) {
+            String own = (String) request.getAttribute("patientId");
+            if (own == null || !own.equals(patientId)) {
+                throw new ApiException(403, "You can only see your own bills.");
+            }
+        }
         return billRepository.findByPatientId(patientId);
     }
 
     @GetMapping("/mine")
     public List<Bill> getMine(HttpServletRequest request) {
         String patientId = (String) request.getAttribute("patientId");
-
-        if (patientId == null) {
-            throw new ApiException(
-                    400,
-                    "No patient record is linked to this account."
-            );
-        }
-
+        if (patientId == null) throw new ApiException(400, "No patient record is linked to this account.");
         return billRepository.findByPatientId(patientId);
     }
 
@@ -49,189 +58,219 @@ public class BillController {
     }
 
     @PostMapping
-    public Bill create(@RequestBody Bill bill) {
+    public Bill create(@RequestBody Bill incoming, HttpServletRequest request) {
+        if (incoming.getPatientId() == null || !patientRepository.existsById(incoming.getPatientId())) {
+            throw new ApiException(404, "Select a valid patient.");
+        }
+        if (incoming.getItems() == null || incoming.getItems().isEmpty()) {
+            throw new ApiException(400, "Add at least one line item.");
+        }
 
-        double total = bill.getItems() == null
-                ? 0
-                : bill.getItems()
-                .stream()
-                .mapToDouble(Bill.BillItem::getAmount)
-                .sum();
+        List<Bill.BillItem> items = new ArrayList<>();
+        double total = 0;
+        for (Bill.BillItem item : incoming.getItems()) {
+            if (item.getDescription() == null || item.getDescription().isBlank() || item.getAmount() < 0) {
+                throw new ApiException(400, "Every line item needs a description and a valid amount.");
+            }
+            items.add(new Bill.BillItem(item.getDescription().trim(), Bill.round(item.getAmount())));
+            total += item.getAmount();
+        }
+        total = Bill.round(total);
+        if (total <= 0) throw new ApiException(400, "The bill total must be more than zero.");
 
+        Bill bill = new Bill();
+        bill.setPatientId(incoming.getPatientId());
+        bill.setAppointmentId(incoming.getAppointmentId());
+        bill.setItems(items);
         bill.setTotal(total);
-        bill.setStatus("PENDING");
-        bill.setPaymentMethod(null);
-        bill.setPatientPayableAmount(total);
 
+        double covered = Bill.round(incoming.getHmoCoveredAmount());
+        if (covered < 0) throw new ApiException(400, "The HMO-covered amount cannot be negative.");
+        if (covered > total) throw new ApiException(400, "The HMO-covered amount cannot be more than the bill total.");
+        if (covered > 0) {
+            String provider = incoming.getHmoProvider() == null ? "" : incoming.getHmoProvider().trim();
+            String member = incoming.getHmoMemberNumber() == null ? "" : incoming.getHmoMemberNumber().trim();
+            if (provider.isEmpty() || member.isEmpty()) {
+                throw new ApiException(400, "Enter the HMO provider and the HMO member number.");
+            }
+            bill.setHmoProvider(provider);
+            bill.setHmoMemberNumber(member);
+            bill.setHmoCoveredAmount(covered);
+            bill.setClaimStatus("PENDING");
+            bill.setClaimUpdatedAt(LocalDateTime.now());
+        }
+
+        bill.recalculateStatus();
+        Bill saved = billRepository.save(bill);
+        request.setAttribute("auditDetail", "Bill of " + money(total) + " created"
+                + (covered > 0 ? " with " + money(covered) + " claimed from " + bill.getHmoProvider() : ""));
+        return saved;
+    }
+
+    // Records a payment by the patient. No amount means "pay the whole balance". Demo only: no real gateway.
+    @PostMapping("/{id}/pay")
+    public Bill pay(@PathVariable String id,
+                    @RequestBody(required = false) Map<String, Object> body,
+                    HttpServletRequest request) {
+        Bill bill = billRepository.findById(id).orElseThrow(() -> new ApiException(404, "Bill not found."));
+        checkOwnership(bill, request);
+
+        if ("PAID".equals(bill.getStatus())) {
+            throw new ApiException(409, "This bill is already fully paid.");
+        }
+        double balance = bill.getBalance();
+        if (balance <= 0.005) {
+            throw new ApiException(409, "The patient owes nothing right now. The rest is waiting for the HMO.");
+        }
+
+        double amount = balance;
+        String method = "Demo";
+        if (body != null) {
+            Object rawAmount = body.get("amount");
+            if (rawAmount != null && !rawAmount.toString().isBlank()) amount = toDouble(rawAmount);
+            Object rawMethod = body.get("method");
+            if (rawMethod != null && !rawMethod.toString().isBlank()) method = rawMethod.toString().trim();
+        }
+        if (Double.isNaN(amount) || amount <= 0) {
+            throw new ApiException(400, "Enter an amount greater than zero.");
+        }
+        amount = Bill.round(amount);
+        if (amount > balance + 0.005) {
+            throw new ApiException(400, "The amount is more than the remaining balance of " + money(balance) + ".");
+        }
+        amount = Math.min(amount, balance);
+        if (!METHODS.contains(method)) {
+            throw new ApiException(400, "Choose a valid payment method.");
+        }
+
+        Bill.Payment payment = new Bill.Payment();
+        payment.setReceiptNumber("RCP-" + LocalDate.now().toString().replace("-", "") + "-"
+                + UUID.randomUUID().toString().substring(0, 5).toUpperCase());
+        payment.setAmount(amount);
+        payment.setMethod(method);
+        payment.setPaidAt(LocalDateTime.now());
+        payment.setReceivedBy((String) request.getAttribute("username"));
+
+        if (bill.getPayments() == null) bill.setPayments(new ArrayList<>());
+        bill.getPayments().add(payment);
+        bill.setAmountPaid(Bill.round(bill.getAmountPaid() + amount));
+        bill.setTransactionId(payment.getReceiptNumber());
+        bill.recalculateStatus();
+        if ("PAID".equals(bill.getStatus())) bill.setPaymentReminderSent(true);
+        payment.setBalanceAfter(bill.getBalance());
+
+        request.setAttribute("auditDetail", "Payment of " + money(amount) + " by " + method
+                + " (receipt " + payment.getReceiptNumber() + "), balance " + money(bill.getBalance()));
         return billRepository.save(bill);
     }
 
-    @PostMapping("/{id}/pay")
-    public ResponseEntity<Bill> payDemo(
-            @PathVariable String id,
-            @RequestBody(required = false) Map<String, Object> body,
-            HttpServletRequest request
-    ) {
+    // Staff update where the HMO claim stands
+    @PutMapping("/{id}/claim")
+    public Bill updateClaim(@PathVariable String id, @RequestBody Map<String, Object> body, HttpServletRequest request) {
+        Bill bill = billRepository.findById(id).orElseThrow(() -> new ApiException(404, "Bill not found."));
+        if (bill.getHmoCoveredAmount() <= 0) {
+            throw new ApiException(409, "This bill has no HMO portion.");
+        }
 
-        return billRepository.findById(id)
-                .map(bill -> {
+        String status = body.get("claimStatus") == null ? "" : body.get("claimStatus").toString();
+        if (!CLAIM_STATUSES.contains(status)) {
+            throw new ApiException(400, "Claim status must be Pending, Approved, Partially approved or Rejected.");
+        }
 
-                    String role = (String) request.getAttribute("role");
+        double approved = 0;
+        if (status.equals("APPROVED")) {
+            approved = bill.getHmoCoveredAmount();
+        } else if (status.equals("PARTIALLY_APPROVED")) {
+            approved = Bill.round(toDouble(body.get("approvedAmount")));
+            if (Double.isNaN(approved) || approved <= 0 || approved >= bill.getHmoCoveredAmount()) {
+                throw new ApiException(400, "For a partial approval, enter an amount above zero and below "
+                        + money(bill.getHmoCoveredAmount()) + ".");
+            }
+        }
 
-                    if ("PATIENT".equals(role)) {
+        bill.setClaimStatus(status);
+        bill.setHmoApprovedAmount(approved);
+        Object note = body.get("note");
+        bill.setClaimNote(note == null || note.toString().isBlank() ? null : note.toString().trim());
+        bill.setClaimUpdatedAt(LocalDateTime.now());
+        bill.recalculateStatus();
 
-                        String ownPatientId =
-                                (String) request.getAttribute("patientId");
+        request.setAttribute("auditDetail", "HMO claim set to " + status
+                + (status.equals("PARTIALLY_APPROVED") ? " (" + money(approved) + " approved)" : ""));
+        return billRepository.save(bill);
+    }
 
-                        if (
-                                ownPatientId == null ||
-                                        !ownPatientId.equals(bill.getPatientId())
-                        ) {
-                            throw new ApiException(
-                                    403,
-                                    "You can only pay your own bills."
-                            );
-                        }
-                    }
+    // Everything needed to show or print a receipt for one payment (defaults to the latest payment)
+    @GetMapping("/{id}/receipt")
+    public Map<String, Object> receipt(@PathVariable String id,
+                                       @RequestParam(required = false) String payment,
+                                       HttpServletRequest request) {
+        Bill bill = billRepository.findById(id).orElseThrow(() -> new ApiException(404, "Bill not found."));
+        checkOwnership(bill, request);
 
-                    String paymentMethod =
-                            body == null
-                                    ? "PATIENT"
-                                    : String.valueOf(
-                                    body.getOrDefault(
-                                            "paymentMethod",
-                                            "PATIENT"
-                                    )
-                            );
+        List<Bill.Payment> payments = bill.getPayments() == null ? new ArrayList<>() : bill.getPayments();
+        Bill.Payment chosen = null;
+        for (Bill.Payment p : payments) {
+            if (payment == null || payment.isBlank() || payment.equals(p.getReceiptNumber())) chosen = p;
+            if (payment != null && !payment.isBlank() && payment.equals(p.getReceiptNumber())) break;
+        }
+        if (chosen == null) {
+            throw new ApiException(404, "No payment has been recorded for this bill yet.");
+        }
 
-                    if (
-                            !"PATIENT".equals(paymentMethod) &&
-                                    !"HMO".equals(paymentMethod)
-                    ) {
-                        throw new ApiException(
-                                400,
-                                "Invalid payment method."
-                        );
-                    }
+        Patient patient = patientRepository.findById(bill.getPatientId()).orElse(null);
+        String patientId = bill.getPatientId() == null ? "" : bill.getPatientId();
 
-                    if ("HMO".equals(paymentMethod)) {
-
-                        String provider =
-                                body == null
-                                        ? ""
-                                        : String.valueOf(
-                                        body.getOrDefault(
-                                                "hmoProvider",
-                                                ""
-                                        )
-                                ).trim();
-
-                        String memberNumber =
-                                body == null
-                                        ? ""
-                                        : String.valueOf(
-                                        body.getOrDefault(
-                                                "hmoMemberNumber",
-                                                ""
-                                        )
-                                ).trim();
-
-                        double coveredAmount;
-
-                        try {
-                            coveredAmount =
-                                    body == null
-                                            ? 0
-                                            : Double.parseDouble(
-                                            String.valueOf(
-                                                    body.getOrDefault(
-                                                            "hmoCoveredAmount",
-                                                            "0"
-                                                    )
-                                            )
-                                    );
-                        } catch (NumberFormatException ex) {
-                            throw new ApiException(
-                                    400,
-                                    "HMO covered amount must be a valid number."
-                            );
-                        }
-
-                        if (provider.isBlank() || memberNumber.isBlank()) {
-                            throw new ApiException(
-                                    400,
-                                    "HMO provider and member number are required."
-                            );
-                        }
-
-                        if (
-                                coveredAmount <= 0 ||
-                                        coveredAmount > bill.getTotal()
-                        ) {
-                            throw new ApiException(
-                                    400,
-                                    "HMO covered amount must be greater than 0 and not exceed the bill total."
-                            );
-                        }
-
-                        bill.setPaymentMethod("HMO");
-                        bill.setHmoProvider(provider);
-                        bill.setHmoMemberNumber(memberNumber);
-                        bill.setHmoCoveredAmount(coveredAmount);
-
-                        bill.setPatientPayableAmount(
-                                Math.max(
-                                        0,
-                                        bill.getTotal() - coveredAmount
-                                )
-                        );
-
-                    } else {
-
-                        bill.setPaymentMethod("PATIENT");
-
-                        double patientAmount =
-                                bill.getPatientPayableAmount() > 0
-                                        ? bill.getPatientPayableAmount()
-                                        : bill.getTotal();
-
-                        bill.setPatientPayableAmount(patientAmount);
-                    }
-
-                    boolean hmoPayment =
-                            "HMO".equals(paymentMethod);
-
-                    if (
-                            hmoPayment &&
-                                    bill.getHmoCoveredAmount() < bill.getTotal()
-                    ) {
-                        bill.setStatus("PARTIALLY_PAID");
-                    } else {
-                        bill.setStatus("PAID");
-                    }
-
-                    bill.setPaymentReminderSent(true);
-
-                    bill.setTransactionId(
-                            (hmoPayment ? "HMO-" : "DEMO-") +
-                                    UUID.randomUUID()
-                                            .toString()
-                                            .substring(0, 8)
-                                            .toUpperCase()
-                    );
-
-                    bill.setPaidAt(LocalDateTime.now());
-
-                    return ResponseEntity.ok(
-                            billRepository.save(bill)
-                    );
-                })
-                .orElse(ResponseEntity.notFound().build());
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("hospital", "MediCore Hospital");
+        result.put("receiptNumber", chosen.getReceiptNumber());
+        result.put("paidAt", chosen.getPaidAt());
+        result.put("patientName", patient == null ? "Unknown patient" : patient.getName());
+        result.put("patientCode", "MC-" + patientId.substring(Math.max(0, patientId.length() - 8)).toUpperCase());
+        result.put("items", bill.getItems());
+        result.put("total", bill.getTotal());
+        result.put("hmoProvider", bill.getHmoProvider());
+        result.put("hmoMemberNumber", bill.getHmoMemberNumber());
+        result.put("hmoCoveredAmount", bill.getHmoCoveredAmount());
+        result.put("hmoAmount", bill.getHmoAmount());
+        result.put("claimStatus", bill.getClaimStatus());
+        result.put("patientShare", bill.getPatientShare());
+        result.put("paymentAmount", chosen.getAmount());
+        result.put("method", chosen.getMethod());
+        result.put("receivedBy", chosen.getReceivedBy());
+        result.put("totalPaid", bill.getAmountPaid());
+        result.put("balance", bill.getBalance());
+        result.put("status", bill.getStatus());
+        return result;
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> delete(@PathVariable String id) {
+    public ResponseEntity<?> delete(@PathVariable String id, HttpServletRequest request) {
+        request.setAttribute("auditDetail", "Bill " + id + " deleted");
         billRepository.deleteById(id);
         return ResponseEntity.ok().build();
+    }
+
+    private void checkOwnership(Bill bill, HttpServletRequest request) {
+        if ("PATIENT".equals(request.getAttribute("role"))) {
+            String own = (String) request.getAttribute("patientId");
+            if (own == null || !own.equals(bill.getPatientId())) {
+                throw new ApiException(403, "You can only use your own bills.");
+            }
+        }
+    }
+
+    private double toDouble(Object value) {
+        if (value == null) return Double.NaN;
+        if (value instanceof Number) return ((Number) value).doubleValue();
+        try {
+            return Double.parseDouble(value.toString().trim());
+        } catch (NumberFormatException e) {
+            return Double.NaN;
+        }
+    }
+
+    private String money(double value) {
+        return "NGN " + String.format(Locale.US, "%,.2f", value);
     }
 }

@@ -5,12 +5,14 @@ import Doctors from './Doctors';
 import Appointments from './Appointments';
 import Billing from './Billing';
 import Pharmacy from './Pharmacy';
+import PrescriptionQueue from './PrescriptionQueue';
 import Dashboard from './Dashboard';
 import Notifications from './Notifications';
 import VisitationAdmin from './VisitationAdmin';
 import AccountSettings from './AccountSettings';
 import EmergencyPatients from './EmergencyPatients';
 import ReceptionistRequests from './ReceptionistRequests';
+import AuditLogPage from './AuditLogPage';
 
 const NAV = [
   { key: 'dashboard', label: 'Dashboard' },
@@ -22,6 +24,8 @@ const NAV = [
   { key: 'visitation', label: 'Visitation' },
   { key: 'billing', label: 'Billing' },
   { key: 'pharmacy', label: 'Pharmacy' },
+  { key: 'prescriptions', label: 'Prescriptions' },
+  { key: 'audit', label: 'Audit log' },
   { key: 'reminders', label: 'Reminders' },
   { key: 'account', label: 'My account' },
 ];
@@ -46,6 +50,8 @@ function AdminPage({ onLogout }) {
       {activeTab === 'visitation' && <VisitationAdmin />}
       {activeTab === 'billing' && <Billing />}
       {activeTab === 'pharmacy' && <Pharmacy />}
+      {activeTab === 'prescriptions' && <PrescriptionQueue />}
+      {activeTab === 'audit' && <AuditLogPage />}
       {activeTab === 'reminders' && <Notifications />}
       {activeTab === 'account' && <AccountSettings />}
     </AppShell>

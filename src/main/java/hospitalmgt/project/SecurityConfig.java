@@ -88,12 +88,31 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/bills/patient/**").hasAnyRole("PATIENT", "DOCTOR", "ADMIN", "RECEPTIONIST")
                         .requestMatchers(HttpMethod.GET, "/api/bills").hasAnyRole("ADMIN", "RECEPTIONIST")
                         .requestMatchers(HttpMethod.POST, "/api/bills/*/pay").hasAnyRole("PATIENT", "ADMIN", "RECEPTIONIST")
+                        .requestMatchers(HttpMethod.PUT, "/api/bills/*/claim").hasAnyRole("ADMIN", "RECEPTIONIST")
+                        .requestMatchers(HttpMethod.GET, "/api/bills/*/receipt").hasAnyRole("PATIENT", "ADMIN", "RECEPTIONIST")
                         .requestMatchers(HttpMethod.POST, "/api/bills").hasAnyRole("ADMIN", "RECEPTIONIST")
                         .requestMatchers(HttpMethod.DELETE, "/api/bills/**").hasRole("ADMIN")
                         .requestMatchers("/api/bills/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/medicines").hasAnyRole("ADMIN", "DOCTOR")
                         .requestMatchers("/api/medicines/**").hasRole("ADMIN")
+
+                        .requestMatchers(HttpMethod.GET, "/api/prescriptions/mine").hasAnyRole("PATIENT", "DOCTOR")
+                        .requestMatchers(HttpMethod.POST, "/api/prescriptions").hasRole("DOCTOR")
+                        .requestMatchers(HttpMethod.GET, "/api/prescriptions/patient/**").hasAnyRole("DOCTOR", "ADMIN")
                         .requestMatchers("/api/prescriptions/**").hasRole("ADMIN")
+
+                        .requestMatchers(HttpMethod.GET, "/api/statistics/me").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/dashboard/me").authenticated()
                         .requestMatchers("/api/statistics/**").hasRole("ADMIN")
+
+                        .requestMatchers(HttpMethod.GET, "/api/diagnoses/*").hasAnyRole("DOCTOR", "ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/diagnoses/*").hasRole("DOCTOR")
+
+                        .requestMatchers(HttpMethod.GET, "/api/timeline/mine").hasRole("PATIENT")
+                        .requestMatchers(HttpMethod.GET, "/api/timeline/patient/*").hasAnyRole("DOCTOR", "ADMIN")
+
+                        .requestMatchers("/api/audit/**").hasRole("ADMIN")
+                        .requestMatchers("/api/admin/export").hasRole("ADMIN")
 
                         .requestMatchers("/api/frontdesk/**").hasAnyRole("ADMIN", "RECEPTIONIST")
 

@@ -9,12 +9,9 @@ public class User {
 
     @Id
     private String id;
-
     private String username;
-
     @JsonIgnore
     private String password;
-
     private String role;
     private String email;
     private String patientId;
@@ -23,8 +20,7 @@ public class User {
     private String requestedRole;
     private String fullName;
     private String phoneNumber;
-
-    // True when an account was created with a temporary password.
+    // true while the account still uses a password that staff set for the person
     private boolean temporaryPassword = false;
 
     public User() {}
@@ -35,99 +31,28 @@ public class User {
         this.role = role;
     }
 
-    public String getId() {
-        return id;
-    }
-
-    public void setId(String id) {
-        this.id = id;
-    }
-
-    public String getUsername() {
-        return username;
-    }
-
-    public void setUsername(String username) {
-        this.username = username;
-    }
-
-    public String getPassword() {
-        return password;
-    }
-
-    public void setPassword(String password) {
-        this.password = password;
-    }
-
-    public String getRole() {
-        return role;
-    }
-
-    public void setRole(String role) {
-        this.role = role;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
-    }
-
-    public String getPatientId() {
-        return patientId;
-    }
-
-    public void setPatientId(String patientId) {
-        this.patientId = patientId;
-    }
-
-    public String getDoctorId() {
-        return doctorId;
-    }
-
-    public void setDoctorId(String doctorId) {
-        this.doctorId = doctorId;
-    }
-
-    public boolean isApproved() {
-        return approved;
-    }
-
-    public void setApproved(boolean approved) {
-        this.approved = approved;
-    }
-
-    public String getRequestedRole() {
-        return requestedRole;
-    }
-
-    public void setRequestedRole(String requestedRole) {
-        this.requestedRole = requestedRole;
-    }
-
-    public String getFullName() {
-        return fullName;
-    }
-
-    public void setFullName(String fullName) {
-        this.fullName = fullName;
-    }
-
-    public String getPhoneNumber() {
-        return phoneNumber;
-    }
-
-    public void setPhoneNumber(String phoneNumber) {
-        this.phoneNumber = phoneNumber;
-    }
-
-    public boolean isTemporaryPassword() {
-        return temporaryPassword;
-    }
-
-    public void setTemporaryPassword(boolean temporaryPassword) {
-        this.temporaryPassword = temporaryPassword;
-    }
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
+    public String getUsername() { return username; }
+    public void setUsername(String username) { this.username = username; }
+    public String getPassword() { return password; }
+    public void setPassword(String password) { this.password = password; }
+    public String getRole() { return role; }
+    public void setRole(String role) { this.role = role; }
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
+    public String getPatientId() { return patientId; }
+    public void setPatientId(String patientId) { this.patientId = patientId; }
+    public String getDoctorId() { return doctorId; }
+    public void setDoctorId(String doctorId) { this.doctorId = doctorId; }
+    public boolean isApproved() { return approved; }
+    public void setApproved(boolean approved) { this.approved = approved; }
+    public String getRequestedRole() { return requestedRole; }
+    public String getFullName() { return fullName; }
+    public void setFullName(String fullName) { this.fullName = fullName; }
+    public String getPhoneNumber() { return phoneNumber; }
+    public void setPhoneNumber(String phoneNumber) { this.phoneNumber = phoneNumber; }
+    public void setRequestedRole(String requestedRole) { this.requestedRole = requestedRole; }
+    public boolean isTemporaryPassword() { return temporaryPassword; }
+    public void setTemporaryPassword(boolean temporaryPassword) { this.temporaryPassword = temporaryPassword; }
 }
