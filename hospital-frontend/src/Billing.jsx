@@ -3,7 +3,9 @@ import api from './api';
 import { useConfirm } from './ConfirmDialog';
 import { formatNaira } from './currency';
 import Receipt from './Receipt';
-import { STAFF_METHODS, statusBadge, statusLabel, claimBadge, claimLabel, lastReceipt } from './billingHelpers';
+import HmoReceipt from './HmoReceipt';
+import HmoActions from './HmoActions';
+import { STAFF_METHODS, statusBadge, statusLabel, claimBadge, claimLabel, lastReceipt, percentText } from './billingHelpers';
 
 const EMPTY_ITEMS = [{ description: '', amount: '' }];
 
@@ -16,7 +18,8 @@ function Billing() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [filter, setFilter] = useState('ALL');
-  const [receipt, setReceipt] = useState(null); // { billId, payment }
+  const [receipt, setReceipt] = useState(null);       // { billId, payment }
+  const [hmoReceiptFor, setHmoReceiptFor] = useState(null);
 
   // Create-bill form
   const [patientId, setPatientId] = useState('');
@@ -24,15 +27,12 @@ function Billing() {
   const [hmoOn, setHmoOn] = useState(false);
   const [hmoProvider, setHmoProvider] = useState('');
   const [hmoMember, setHmoMember] = useState('');
-  const [hmoCovered, setHmoCovered] = useState('');
+  const [hmoPercent, setHmoPercent] = useState('');
 
-  // Record-payment and HMO-claim panels (only one open at a time)
-  const [panel, setPanel] = useState(null); // { type: 'pay' | 'claim', bill }
+  // Record-payment panel
+  const [paying, setPaying] = useState(null);
   const [payAmount, setPayAmount] = useState('');
   const [payMethod, setPayMethod] = useState('Cash');
-  const [claimStatus, setClaimStatus] = useState('PENDING');
-  const [claimApproved, setClaimApproved] = useState('');
-  const [claimNote, setClaimNote] = useState('');
 
   useEffect(() => {
     fetchBills();
@@ -47,7 +47,8 @@ function Billing() {
   const patientName = (id) => patients.find((p) => p.id === id)?.name || 'Unknown';
 
   const total = items.reduce((sum, it) => sum + (Number(it.amount) || 0), 0);
-  const covered = hmoOn ? Number(hmoCovered) || 0 : 0;
+  const percent = hmoOn ? Math.min(100, Math.max(0, Number(hmoPercent) || 0)) : 0;
+  const covered = Math.round(total * percent) / 100;
 
   const choosePatient = (id) => {
     setPatientId(id);
@@ -69,7 +70,7 @@ function Billing() {
     setHmoOn(false);
     setHmoProvider('');
     setHmoMember('');
-    setHmoCovered('');
+    setHmoPercent('');
   };
 
   const createBill = async (e) => {
@@ -83,8 +84,8 @@ function Billing() {
       setError('Choose a patient and add at least one line item.');
       return;
     }
-    if (covered > total) {
-      setError('The HMO-covered amount cannot be more than the bill total.');
+    if (hmoOn && (Number(hmoPercent) <= 0 || Number(hmoPercent) > 100)) {
+      setError('Enter an HMO coverage between 1% and 100%.');
       return;
     }
     try {
@@ -93,7 +94,7 @@ function Billing() {
         items: cleanItems,
         hmoProvider: hmoOn ? hmoProvider : null,
         hmoMemberNumber: hmoOn ? hmoMember : null,
-        hmoCoveredAmount: covered,
+        hmoCoveragePercent: hmoOn ? Number(hmoPercent) : 0,
       });
       resetForm();
       setMessage('Bill created.');
@@ -108,17 +109,7 @@ function Billing() {
     setMessage('');
     setPayAmount(String(bill.balance));
     setPayMethod('Cash');
-    setPanel({ type: 'pay', bill });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const openClaim = (bill) => {
-    setError('');
-    setMessage('');
-    setClaimStatus(bill.claimStatus === 'NONE' ? 'PENDING' : bill.claimStatus);
-    setClaimApproved(bill.hmoApprovedAmount ? String(bill.hmoApprovedAmount) : '');
-    setClaimNote(bill.claimNote || '');
-    setPanel({ type: 'claim', bill });
+    setPaying(bill);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -126,33 +117,16 @@ function Billing() {
     e.preventDefault();
     setError('');
     try {
-      const response = await api.post(`/api/bills/${panel.bill.id}/pay`, {
+      const response = await api.post(`/api/bills/${paying.id}/pay`, {
         amount: Number(payAmount),
         method: payMethod,
       });
-      setPanel(null);
+      setPaying(null);
       setMessage('Payment recorded.');
       await fetchBills();
       setReceipt({ billId: response.data.id, payment: lastReceipt(response.data) });
     } catch (err) {
       setError(err.response?.data?.message || 'Could not record the payment.');
-    }
-  };
-
-  const submitClaim = async (e) => {
-    e.preventDefault();
-    setError('');
-    try {
-      await api.put(`/api/bills/${panel.bill.id}/claim`, {
-        claimStatus,
-        approvedAmount: claimStatus === 'PARTIALLY_APPROVED' ? Number(claimApproved) : null,
-        note: claimNote,
-      });
-      setPanel(null);
-      setMessage('HMO claim updated.');
-      fetchBills();
-    } catch (err) {
-      setError(err.response?.data?.message || 'Could not update the claim.');
     }
   };
 
@@ -164,7 +138,7 @@ function Billing() {
 
   const visible = useMemo(() => {
     if (filter === 'OUTSTANDING') return bills.filter((b) => b.status !== 'PAID');
-    if (filter === 'CLAIMS') return bills.filter((b) => b.claimStatus === 'PENDING');
+    if (filter === 'HMO') return bills.filter((b) => b.hmoCoveredAmount > 0);
     if (filter === 'PAID') return bills.filter((b) => b.status === 'PAID');
     return bills;
   }, [bills, filter]);
@@ -173,23 +147,23 @@ function Billing() {
     <div>
       <div className="page-head">
         <h1>Billing</h1>
-        <p>Create bills, split them with the patient's HMO, record payments and follow HMO claims.</p>
+        <p>Create bills, split them with the patient's HMO by percentage, record payments and print receipts. Claim approvals are on the HMO claims page.</p>
       </div>
 
       {message && <p className="alert alert-success">{message}</p>}
       {error && <p className="alert alert-error" role="alert">{error}</p>}
 
-      {panel && panel.type === 'pay' && (
+      {paying && (
         <section className="panel prompt-card">
-          <h2 className="panel-title">Record a payment: {patientName(panel.bill.patientId)}</h2>
+          <h2 className="panel-title">Record a payment: {patientName(paying.patientId)}</h2>
           <p className="muted">
-            Bill total {formatNaira(panel.bill.total)} · Patient's share {formatNaira(panel.bill.patientShare)} · Paid{' '}
-            {formatNaira(panel.bill.amountPaid)} · <strong>Balance {formatNaira(panel.bill.balance)}</strong>
+            Bill total {formatNaira(paying.total)} · Patient's share {formatNaira(paying.patientShare)} · Paid{' '}
+            {formatNaira(paying.amountPaid)} · <strong>Balance {formatNaira(paying.balance)}</strong>
           </p>
           <form className="form-grid" onSubmit={submitPayment}>
             <label className="field">
               <span>Amount paid (₦)</span>
-              <input type="number" min="0.01" step="0.01" max={panel.bill.balance} value={payAmount} onChange={(e) => setPayAmount(e.target.value)} required />
+              <input type="number" min="0.01" step="0.01" max={paying.balance} value={payAmount} onChange={(e) => setPayAmount(e.target.value)} required />
               <small className="field-hint">Pay part of the balance or all of it.</small>
             </label>
             <label className="field">
@@ -200,42 +174,7 @@ function Billing() {
             </label>
             <div className="form-actions">
               <button type="submit" className="btn btn-primary">Record payment</button>
-              <button type="button" className="btn btn-quiet" onClick={() => setPanel(null)}>Cancel</button>
-            </div>
-          </form>
-        </section>
-      )}
-
-      {panel && panel.type === 'claim' && (
-        <section className="panel prompt-card">
-          <h2 className="panel-title">HMO claim: {patientName(panel.bill.patientId)}</h2>
-          <p className="muted">
-            {panel.bill.hmoProvider} · member {panel.bill.hmoMemberNumber} · claimed {formatNaira(panel.bill.hmoCoveredAmount)}
-          </p>
-          <form className="form-grid" onSubmit={submitClaim}>
-            <label className="field">
-              <span>Claim status</span>
-              <select value={claimStatus} onChange={(e) => setClaimStatus(e.target.value)}>
-                <option value="PENDING">Pending</option>
-                <option value="APPROVED">Approved</option>
-                <option value="PARTIALLY_APPROVED">Partially approved</option>
-                <option value="REJECTED">Rejected</option>
-              </select>
-            </label>
-            {claimStatus === 'PARTIALLY_APPROVED' && (
-              <label className="field">
-                <span>Amount the HMO approved (₦)</span>
-                <input type="number" min="0.01" step="0.01" value={claimApproved} onChange={(e) => setClaimApproved(e.target.value)} required />
-                <small className="field-hint">Less than {formatNaira(panel.bill.hmoCoveredAmount)}. The patient pays the rest.</small>
-              </label>
-            )}
-            <label className="field field-full">
-              <span>Note (optional)</span>
-              <input type="text" value={claimNote} onChange={(e) => setClaimNote(e.target.value)} placeholder="Reason from the HMO, reference number..." />
-            </label>
-            <div className="form-actions">
-              <button type="submit" className="btn btn-primary">Save claim status</button>
-              <button type="button" className="btn btn-quiet" onClick={() => setPanel(null)}>Cancel</button>
+              <button type="button" className="btn btn-quiet" onClick={() => setPaying(null)}>Cancel</button>
             </div>
           </form>
         </section>
@@ -290,8 +229,9 @@ function Billing() {
                 <input type="text" value={hmoMember} onChange={(e) => setHmoMember(e.target.value)} required />
               </label>
               <label className="field">
-                <span>HMO-covered amount (₦)</span>
-                <input type="number" min="0" step="0.01" max={total || undefined} value={hmoCovered} onChange={(e) => setHmoCovered(e.target.value)} required />
+                <span>HMO coverage (%)</span>
+                <input type="number" min="1" max="100" step="0.5" placeholder="e.g. 80" value={hmoPercent} onChange={(e) => setHmoPercent(e.target.value)} required />
+                <small className="field-hint">The share of the bill the HMO pays. The patient pays the rest.</small>
               </label>
             </>
           )}
@@ -299,7 +239,7 @@ function Billing() {
           <div className="field field-full">
             <div className="summary-strip">
               <div><span>Bill total</span><strong>{formatNaira(total)}</strong></div>
-              <div><span>HMO covers</span><strong>{formatNaira(covered)}</strong></div>
+              <div><span>HMO covers {hmoOn ? percentText(percent) : ''}</span><strong>{formatNaira(covered)}</strong></div>
               <div><span>Patient pays</span><strong>{formatNaira(Math.max(0, total - covered))}</strong></div>
             </div>
           </div>
@@ -316,7 +256,7 @@ function Billing() {
           <select className="cell-select" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Filter bills">
             <option value="ALL">All bills</option>
             <option value="OUTSTANDING">Outstanding</option>
-            <option value="CLAIMS">HMO claims pending</option>
+            <option value="HMO">With an HMO</option>
             <option value="PAID">Paid</option>
           </select>
           <span className="count">{visible.length} {visible.length === 1 ? 'bill' : 'bills'}</span>
@@ -354,11 +294,12 @@ function Billing() {
                     <>
                       <div>{bill.hmoProvider}</div>
                       <div className="notif-meta">Member {bill.hmoMemberNumber}</div>
-                      <div>{formatNaira(bill.hmoCoveredAmount)}</div>
+                      <div>{percentText(bill.hmoCoveragePercent)} · {formatNaira(bill.hmoCoveredAmount)}</div>
                       <span className={claimBadge(bill.claimStatus)}>{claimLabel(bill.claimStatus)}</span>
                       {bill.claimStatus === 'PARTIALLY_APPROVED' && (
-                        <div className="notif-meta">Approved {formatNaira(bill.hmoApprovedAmount)}</div>
+                        <div className="notif-meta">Approved {percentText(bill.hmoApprovedPercent)}</div>
                       )}
+                      <div>{bill.hmoPaid ? <span className="badge badge-completed">HMO paid</span> : <span className="notif-meta">HMO not paid yet</span>}</div>
                     </>
                   ) : (
                     <span className="muted">None</span>
@@ -379,16 +320,12 @@ function Billing() {
                         Record payment
                       </button>
                     )}
-                    {bill.hmoCoveredAmount > 0 && (
-                      <button type="button" className="btn btn-quiet btn-sm" onClick={() => openClaim(bill)}>
-                        HMO claim
-                      </button>
-                    )}
                     {lastReceipt(bill) && (
                       <button type="button" className="btn btn-quiet btn-sm" onClick={() => setReceipt({ billId: bill.id, payment: lastReceipt(bill) })}>
                         Receipt
                       </button>
                     )}
+                    <HmoActions bill={bill} onChanged={fetchBills} onShowReceipt={setHmoReceiptFor} />
                     {role === 'ADMIN' && (
                       <button type="button" className="btn btn-danger btn-sm" onClick={() => deleteBill(bill.id)}>
                         Delete
@@ -403,6 +340,7 @@ function Billing() {
       </div>
 
       {receipt && <Receipt billId={receipt.billId} paymentNumber={receipt.payment} onClose={() => setReceipt(null)} />}
+      {hmoReceiptFor && <HmoReceipt billId={hmoReceiptFor} onClose={() => setHmoReceiptFor(null)} />}
     </div>
   );
 }

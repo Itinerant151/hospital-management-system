@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
@@ -15,10 +16,13 @@ public class CheckInController {
 
     private final CheckInRepository repository;
     private final PatientRepository patientRepository;
+    private final ConsultationService consultationService;
 
-    public CheckInController(CheckInRepository repository, PatientRepository patientRepository) {
+    public CheckInController(CheckInRepository repository, PatientRepository patientRepository,
+                             ConsultationService consultationService) {
         this.repository = repository;
         this.patientRepository = patientRepository;
+        this.consultationService = consultationService;
     }
 
     // Newest check-ins first
@@ -66,7 +70,20 @@ public class CheckInController {
         entry.setCheckInTime(now());
         entry.setStatus("Checked In");
         entry.setHandledBy((String) request.getAttribute("username"));
-        return repository.save(entry);
+        CheckIn saved = repository.save(entry);
+
+        // A patient arriving for a visiting doctor's appointment is billed the consultation fee
+        if (type.equals("PATIENT") && saved.getAppointmentId() != null) {
+            Consultation consultation = consultationService.billCheckIn(
+                    saved.getAppointmentId(), personId, saved.getHandledBy());
+            if (consultation != null) {
+                request.setAttribute("auditDetail", "Front desk check-in of " + personName
+                        + "; consultation fee bill of NGN " + String.format(Locale.US, "%,.2f", consultation.getFee())
+                        + " created");
+            }
+        }
+
+        return saved;
     }
 
     @PutMapping("/{id}/check-out")

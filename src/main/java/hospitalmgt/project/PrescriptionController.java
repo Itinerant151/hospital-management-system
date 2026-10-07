@@ -8,7 +8,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/prescriptions")
@@ -33,13 +35,19 @@ public class PrescriptionController {
     }
 
     // A patient sees their own prescriptions; a doctor sees the ones they issued
+    // plus every prescription of the patients assigned to them
     @GetMapping("/mine")
     public List<Prescription> mine(HttpServletRequest request) {
         String role = (String) request.getAttribute("role");
         if ("DOCTOR".equals(role)) {
             String doctorId = (String) request.getAttribute("doctorId");
             if (doctorId == null) throw new ApiException(400, "No doctor record is linked to this account.");
-            return newestFirst(prescriptionRepository.findByDoctorId(doctorId));
+            Map<String, Prescription> found = new LinkedHashMap<>();
+            for (Prescription p : prescriptionRepository.findByDoctorId(doctorId)) found.put(p.getId(), p);
+            for (Patient patient : patientRepository.findByDoctorId(doctorId)) {
+                for (Prescription p : prescriptionRepository.findByPatientId(patient.getId())) found.put(p.getId(), p);
+            }
+            return newestFirst(new ArrayList<>(found.values()));
         }
         String patientId = (String) request.getAttribute("patientId");
         if (patientId == null) throw new ApiException(400, "No patient record is linked to this account.");
@@ -64,15 +72,60 @@ public class PrescriptionController {
         if (patient == null) throw new ApiException(404, "Choose a patient for this prescription.");
         PatientAccess.checkDoctorAccess(request, patient);
 
-        if (incoming.getItems() == null || incoming.getItems().isEmpty()) {
+        List<Prescription.PrescribedItem> cleaned = cleanItems(incoming.getItems());
+
+        Prescription prescription = new Prescription();
+        prescription.setPatientId(patient.getId());
+        prescription.setPatientName(patient.getName());
+        prescription.setDoctorId(doctorId);
+        prescription.setDoctorName(doctorRepository.findById(doctorId).map(Doctor::getName).orElse("Doctor"));
+        prescription.setItems(cleaned);
+        prescription.setNotes(limit(trim(incoming.getNotes())));
+        prescription.setDateIssued(LocalDate.now());
+        prescription.setCreatedAt(LocalDateTime.now());
+        prescription.setDispensed(false);
+
+        Prescription saved = prescriptionRepository.save(prescription);
+        request.setAttribute("auditDetail", "Prescription issued to " + patient.getName() + " ("
+                + cleaned.size() + (cleaned.size() == 1 ? " medication)" : " medications)"));
+        return saved;
+    }
+
+    // A doctor edits a prescription, but only for a patient who is assigned to them
+    @PutMapping("/{id}")
+    public Prescription update(@PathVariable String id, @RequestBody Prescription incoming, HttpServletRequest request) {
+        String doctorId = (String) request.getAttribute("doctorId");
+        if (doctorId == null) throw new ApiException(403, "Only doctors can edit prescriptions.");
+
+        Prescription prescription = prescriptionRepository.findById(id)
+                .orElseThrow(() -> new ApiException(404, "Prescription not found."));
+        Patient patient = patientRepository.findById(prescription.getPatientId()).orElse(null);
+        if (patient == null || !doctorId.equals(patient.getDoctorId())) {
+            throw new ApiException(403, "You can only edit prescriptions of patients assigned to you.");
+        }
+        if (prescription.isDispensed()) {
+            throw new ApiException(409, "This prescription has already been dispensed, so it can no longer be edited.");
+        }
+
+        prescription.setItems(cleanItems(incoming.getItems()));
+        prescription.setNotes(limit(trim(incoming.getNotes())));
+        prescription.setUpdatedAt(LocalDateTime.now());
+        prescription.setLastEditedBy(doctorRepository.findById(doctorId).map(Doctor::getName).orElse("Doctor"));
+
+        request.setAttribute("auditDetail", "Prescription for " + patient.getName() + " edited");
+        return prescriptionRepository.save(prescription);
+    }
+
+    private List<Prescription.PrescribedItem> cleanItems(List<Prescription.PrescribedItem> items) {
+        if (items == null || items.isEmpty()) {
             throw new ApiException(400, "Add at least one medication.");
         }
-        if (incoming.getItems().size() > 20) {
+        if (items.size() > 20) {
             throw new ApiException(400, "A prescription can have at most 20 medications.");
         }
 
         List<Prescription.PrescribedItem> cleaned = new ArrayList<>();
-        for (Prescription.PrescribedItem item : incoming.getItems()) {
+        for (Prescription.PrescribedItem item : items) {
             String name = trim(item.getMedicationName());
             String medicineId = trim(item.getMedicineId());
 
@@ -95,22 +148,7 @@ public class PrescriptionController {
             clean.setQuantity(item.getQuantity());
             cleaned.add(clean);
         }
-
-        Prescription prescription = new Prescription();
-        prescription.setPatientId(patient.getId());
-        prescription.setPatientName(patient.getName());
-        prescription.setDoctorId(doctorId);
-        prescription.setDoctorName(doctorRepository.findById(doctorId).map(Doctor::getName).orElse("Doctor"));
-        prescription.setItems(cleaned);
-        prescription.setNotes(limit(trim(incoming.getNotes())));
-        prescription.setDateIssued(LocalDate.now());
-        prescription.setCreatedAt(LocalDateTime.now());
-        prescription.setDispensed(false);
-
-        Prescription saved = prescriptionRepository.save(prescription);
-        request.setAttribute("auditDetail", "Prescription issued to " + patient.getName() + " ("
-                + cleaned.size() + (cleaned.size() == 1 ? " medication)" : " medications)"));
-        return saved;
+        return cleaned;
     }
 
     // Marks a prescription dispensed and takes the quantities out of the pharmacy stock

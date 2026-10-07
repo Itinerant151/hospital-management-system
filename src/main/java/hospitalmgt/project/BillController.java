@@ -84,10 +84,12 @@ public class BillController {
         bill.setItems(items);
         bill.setTotal(total);
 
-        double covered = Bill.round(incoming.getHmoCoveredAmount());
-        if (covered < 0) throw new ApiException(400, "The HMO-covered amount cannot be negative.");
-        if (covered > total) throw new ApiException(400, "The HMO-covered amount cannot be more than the bill total.");
-        if (covered > 0) {
+        double percent = Bill.round(incoming.getHmoCoveragePercent());
+        if (percent < 0 || percent > 100) {
+            throw new ApiException(400, "The HMO coverage must be between 0% and 100%.");
+        }
+        double covered = Bill.round(total * percent / 100.0);
+        if (percent > 0) {
             String provider = incoming.getHmoProvider() == null ? "" : incoming.getHmoProvider().trim();
             String member = incoming.getHmoMemberNumber() == null ? "" : incoming.getHmoMemberNumber().trim();
             if (provider.isEmpty() || member.isEmpty()) {
@@ -95,6 +97,7 @@ public class BillController {
             }
             bill.setHmoProvider(provider);
             bill.setHmoMemberNumber(member);
+            bill.setHmoCoveragePercent(percent);
             bill.setHmoCoveredAmount(covered);
             bill.setClaimStatus("PENDING");
             bill.setClaimUpdatedAt(LocalDateTime.now());
@@ -103,7 +106,7 @@ public class BillController {
         bill.recalculateStatus();
         Bill saved = billRepository.save(bill);
         request.setAttribute("auditDetail", "Bill of " + money(total) + " created"
-                + (covered > 0 ? " with " + money(covered) + " claimed from " + bill.getHmoProvider() : ""));
+                + (percent > 0 ? ", HMO covers " + pct(percent) + "% (" + money(covered) + ") via " + bill.getHmoProvider() : ""));
         return saved;
     }
 
@@ -171,6 +174,9 @@ public class BillController {
         if (bill.getHmoCoveredAmount() <= 0) {
             throw new ApiException(409, "This bill has no HMO portion.");
         }
+        if (bill.isHmoPaid()) {
+            throw new ApiException(409, "The HMO has already paid this claim, so it can no longer be changed.");
+        }
 
         String status = body.get("claimStatus") == null ? "" : body.get("claimStatus").toString();
         if (!CLAIM_STATUSES.contains(status)) {
@@ -178,26 +184,102 @@ public class BillController {
         }
 
         double approved = 0;
+        double approvedPercent = 0;
         if (status.equals("APPROVED")) {
             approved = bill.getHmoCoveredAmount();
+            approvedPercent = bill.getHmoCoveragePercent();
         } else if (status.equals("PARTIALLY_APPROVED")) {
-            approved = Bill.round(toDouble(body.get("approvedAmount")));
-            if (Double.isNaN(approved) || approved <= 0 || approved >= bill.getHmoCoveredAmount()) {
-                throw new ApiException(400, "For a partial approval, enter an amount above zero and below "
-                        + money(bill.getHmoCoveredAmount()) + ".");
+            approvedPercent = Bill.round(toDouble(body.get("approvedPercent")));
+            if (Double.isNaN(approvedPercent) || approvedPercent <= 0 || approvedPercent >= bill.getHmoCoveragePercent()) {
+                throw new ApiException(400, "For a partial approval, enter a percentage above 0 and below "
+                        + pct(bill.getHmoCoveragePercent()) + "%.");
             }
+            approved = Bill.round(bill.getTotal() * approvedPercent / 100.0);
         }
 
         bill.setClaimStatus(status);
         bill.setHmoApprovedAmount(approved);
+        bill.setHmoApprovedPercent(approvedPercent);
         Object note = body.get("note");
         bill.setClaimNote(note == null || note.toString().isBlank() ? null : note.toString().trim());
         bill.setClaimUpdatedAt(LocalDateTime.now());
         bill.recalculateStatus();
 
         request.setAttribute("auditDetail", "HMO claim set to " + status
-                + (status.equals("PARTIALLY_APPROVED") ? " (" + money(approved) + " approved)" : ""));
+                + (status.equals("PARTIALLY_APPROVED") ? " (" + pct(approvedPercent) + "% approved, " + money(approved) + ")" : ""));
         return billRepository.save(bill);
+    }
+
+    // The HMO has paid its share: staff mark it as paid and a receipt is created
+    @PostMapping("/{id}/hmo-pay")
+    public Bill hmoPay(@PathVariable String id,
+                       @RequestBody(required = false) Map<String, Object> body,
+                       HttpServletRequest request) {
+        Bill bill = billRepository.findById(id).orElseThrow(() -> new ApiException(404, "Bill not found."));
+        if (bill.getHmoCoveredAmount() <= 0) {
+            throw new ApiException(409, "This bill has no HMO portion.");
+        }
+        if (bill.isHmoPaid()) {
+            throw new ApiException(409, "The HMO payment for this bill is already marked as paid.");
+        }
+        String claim = bill.getClaimStatus();
+        if (!"APPROVED".equals(claim) && !"PARTIALLY_APPROVED".equals(claim)) {
+            throw new ApiException(409, "Approve the HMO claim before marking it as paid.");
+        }
+
+        double amount = Bill.round(bill.getHmoAmount());
+        String reference = "";
+        if (body != null && body.get("reference") != null) {
+            reference = body.get("reference").toString().trim();
+            if (reference.length() > 120) reference = reference.substring(0, 120);
+        }
+
+        bill.setHmoPaid(true);
+        bill.setHmoPaidAmount(amount);
+        bill.setHmoPaidAt(LocalDateTime.now());
+        bill.setHmoPaidBy((String) request.getAttribute("username"));
+        bill.setHmoPaymentReference(reference.isEmpty() ? null : reference);
+        bill.setHmoReceiptNumber("HMO-" + LocalDate.now().toString().replace("-", "") + "-"
+                + UUID.randomUUID().toString().substring(0, 5).toUpperCase());
+        bill.recalculateStatus();
+
+        request.setAttribute("auditDetail", "HMO payment of " + money(amount) + " from " + bill.getHmoProvider()
+                + " marked as paid (receipt " + bill.getHmoReceiptNumber() + ")");
+        return billRepository.save(bill);
+    }
+
+    // Everything needed to show or print the receipt for the HMO's payment
+    @GetMapping("/{id}/hmo-receipt")
+    public Map<String, Object> hmoReceipt(@PathVariable String id, HttpServletRequest request) {
+        Bill bill = billRepository.findById(id).orElseThrow(() -> new ApiException(404, "Bill not found."));
+        checkOwnership(bill, request);
+        if (!bill.isHmoPaid()) {
+            throw new ApiException(404, "The HMO has not paid this bill yet.");
+        }
+
+        Patient patient = patientRepository.findById(bill.getPatientId()).orElse(null);
+        String patientId = bill.getPatientId() == null ? "" : bill.getPatientId();
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("hospital", "MediCore Hospital");
+        result.put("receiptNumber", bill.getHmoReceiptNumber());
+        result.put("paidAt", bill.getHmoPaidAt());
+        result.put("hmoProvider", bill.getHmoProvider());
+        result.put("hmoMemberNumber", bill.getHmoMemberNumber());
+        result.put("reference", bill.getHmoPaymentReference());
+        result.put("patientName", patient == null ? "Unknown patient" : patient.getName());
+        result.put("patientCode", "MC-" + patientId.substring(Math.max(0, patientId.length() - 8)).toUpperCase());
+        result.put("items", bill.getItems());
+        result.put("total", bill.getTotal());
+        result.put("hmoCoveragePercent", bill.getHmoCoveragePercent());
+        result.put("claimStatus", bill.getClaimStatus());
+        result.put("hmoApprovedPercent", bill.getHmoApprovedPercent());
+        result.put("hmoPaidAmount", bill.getHmoPaidAmount());
+        result.put("patientShare", bill.getPatientShare());
+        result.put("patientBalance", bill.getBalance());
+        result.put("receivedBy", bill.getHmoPaidBy());
+        result.put("status", bill.getStatus());
+        return result;
     }
 
     // Everything needed to show or print a receipt for one payment (defaults to the latest payment)
@@ -231,6 +313,7 @@ public class BillController {
         result.put("total", bill.getTotal());
         result.put("hmoProvider", bill.getHmoProvider());
         result.put("hmoMemberNumber", bill.getHmoMemberNumber());
+        result.put("hmoCoveragePercent", bill.getHmoCoveragePercent());
         result.put("hmoCoveredAmount", bill.getHmoCoveredAmount());
         result.put("hmoAmount", bill.getHmoAmount());
         result.put("claimStatus", bill.getClaimStatus());
@@ -268,6 +351,10 @@ public class BillController {
         } catch (NumberFormatException e) {
             return Double.NaN;
         }
+    }
+
+    private String pct(double value) {
+        return value == Math.rint(value) ? String.valueOf((long) value) : String.valueOf(value);
     }
 
     private String money(double value) {

@@ -40,10 +40,11 @@ public class AuthController {
             throw new ApiException(401, "Invalid username or password");
         }
         if (!user.isApproved()) {
+            String applied = "LAB_STAFF".equals(user.getRequestedRole()) ? "laboratory staff" : "receptionist";
             request.setAttribute("auditActor", user.getUsername());
-            request.setAttribute("auditDetail", "Login blocked: receptionist application not approved yet");
+            request.setAttribute("auditDetail", "Login blocked: " + applied + " application not approved yet");
             request.setAttribute("auditAlways", true);
-            throw new ApiException(403, "Your receptionist application is awaiting admin approval.");
+            throw new ApiException(403, "Your " + applied + " application is awaiting admin approval.");
         }
 
         String token = jwtUtil.generateToken(user.getUsername(), user.getRole(), user.getPatientId(), user.getDoctorId());
@@ -63,7 +64,7 @@ public class AuthController {
     @PostMapping("/signup")
     public String signup(@RequestBody Map<String, String> body, HttpServletRequest request) {
         String role = body.get("role");
-        if (role == null || (!role.equals("DOCTOR") && !role.equals("PATIENT") && !role.equals("RECEPTIONIST"))) {
+        if (role == null || (!role.equals("DOCTOR") && !role.equals("PATIENT") && !role.equals("RECEPTIONIST") && !role.equals("LAB_STAFF"))) {
             throw new ApiException(400, "Invalid role for signup");
         }
 
@@ -136,14 +137,17 @@ public class AuthController {
             user.setDoctorId(savedDoctor.getId());
         }
 
-        if (role.equals("RECEPTIONIST")) {
+        // Receptionists and laboratory staff must be approved by an administrator
+        boolean needsApproval = role.equals("RECEPTIONIST") || role.equals("LAB_STAFF");
+
+        if (needsApproval) {
             String name = body.get("name");
             String phoneNumber = body.get("phoneNumber");
             if (name == null || name.isBlank() || phoneNumber == null || phoneNumber.isBlank()) {
-                throw new ApiException(400, "Name and phone number are required for receptionist signup");
+                throw new ApiException(400, "Name and phone number are required for staff signup");
             }
             user.setApproved(false);
-            user.setRequestedRole("RECEPTIONIST");
+            user.setRequestedRole(role);
             user.setFullName(name);
             user.setPhoneNumber(phoneNumber);
         }
@@ -152,12 +156,12 @@ public class AuthController {
 
         request.setAttribute("auditActor", username);
         request.setAttribute("auditRole", role);
-        request.setAttribute("auditDetail", role.equals("RECEPTIONIST")
-                ? "Receptionist application submitted"
+        request.setAttribute("auditDetail", needsApproval
+                ? (role.equals("LAB_STAFF") ? "Laboratory staff" : "Receptionist") + " application submitted"
                 : "Account created (" + role.toLowerCase() + ")");
 
-        return role.equals("RECEPTIONIST")
-                ? "Receptionist application submitted. An administrator must approve it before you can log in."
+        return needsApproval
+                ? "Application submitted. An administrator must approve it before you can log in."
                 : "Account created successfully";
     }
 }

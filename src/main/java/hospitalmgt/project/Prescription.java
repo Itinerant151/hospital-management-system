@@ -23,6 +23,8 @@ public class Prescription {
     private LocalDateTime createdAt; // set when the doctor issues it (older records do not have it)
     private boolean dispensed = false;
     private LocalDateTime dispensedAt;
+    private LocalDateTime updatedAt;  // set when a doctor edits the prescription
+    private String lastEditedBy;
 
     public static class PrescribedItem {
         private String medicineId;      // optional: set when the medicine is in the pharmacy inventory
@@ -71,4 +73,8 @@ public class Prescription {
     public void setDispensed(boolean dispensed) { this.dispensed = dispensed; }
     public LocalDateTime getDispensedAt() { return dispensedAt; }
     public void setDispensedAt(LocalDateTime dispensedAt) { this.dispensedAt = dispensedAt; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public String getLastEditedBy() { return lastEditedBy; }
+    public void setLastEditedBy(String lastEditedBy) { this.lastEditedBy = lastEditedBy; }
 }

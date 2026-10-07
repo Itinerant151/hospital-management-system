@@ -2,12 +2,15 @@ import { useState, useEffect } from 'react';
 import api from './api';
 import StatusBadge from './StatusBadge';
 import { formatDateTime } from './format';
-
-const TIME_SLOTS = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
+import { formatNaira } from './currency';
+import { ALL_SLOTS, allowedTimes, describeSchedule } from './visiting';
+import { useConfirm } from './ConfirmDialog';
 
 function MyAppointments() {
+  const confirm = useConfirm();
   const [appointments, setAppointments] = useState([]);
   const [doctors, setDoctors] = useState([]);
+  const [visitingList, setVisitingList] = useState([]);
   const [doctorId, setDoctorId] = useState('');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
@@ -18,6 +21,7 @@ function MyAppointments() {
   useEffect(() => {
     fetchAppointments();
     fetchDoctors();
+    fetchVisiting();
   }, []);
 
   useEffect(() => {
@@ -38,12 +42,22 @@ function MyAppointments() {
     setDoctors(response.data);
   };
 
+  const fetchVisiting = async () => {
+    const response = await api.get('/api/visiting-doctors');
+    setVisitingList(response.data);
+  };
+
   const fetchAvailability = async () => {
     const response = await api.get('/appointments/availability', {
       params: { doctorId, date },
     });
     setBookedTimes(response.data);
   };
+
+  // A visiting doctor only offers the hours in their weekly schedule
+  const visiting = visitingList.find((v) => v.doctorId === doctorId);
+  const slots = visiting ? allowedTimes(visiting, date) : ALL_SLOTS;
+  const noVisitingHours = Boolean(visiting && date && slots.length === 0);
 
   const bookAppointment = async (e) => {
     e.preventDefault();
@@ -66,7 +80,7 @@ function MyAppointments() {
   };
 
   const cancelAppointment = async (id) => {
-    if (!window.confirm('Cancel this appointment?')) return;
+    if (!(await confirm('Cancel this appointment?', { title: 'Cancel appointment', confirmLabel: 'Yes, cancel it', cancelLabel: 'Keep it' }))) return;
     await api.delete(`/appointments/${id}`);
     fetchAppointments();
   };
@@ -97,11 +111,14 @@ function MyAppointments() {
               required
             >
               <option value="">Select a doctor</option>
-              {doctors.map((doctor) => (
-                <option key={doctor.id} value={doctor.id}>
-                  {doctor.name} ({doctor.specialization})
-                </option>
-              ))}
+              {doctors.map((doctor) => {
+                const v = visitingList.find((item) => item.doctorId === doctor.id);
+                return (
+                  <option key={doctor.id} value={doctor.id} disabled={Boolean(v && !v.active)}>
+                    {doctor.name} ({doctor.specialization}){v ? (v.active ? ' - Visiting' : ' - Visiting, not booking now') : ''}
+                  </option>
+                );
+              })}
             </select>
           </label>
 
@@ -124,10 +141,16 @@ function MyAppointments() {
               value={time}
               onChange={(e) => setTime(e.target.value)}
               required
-              disabled={!doctorId || !date}
+              disabled={!doctorId || !date || noVisitingHours}
             >
-              <option value="">{doctorId && date ? 'Select a time' : 'Pick a doctor and date first'}</option>
-              {TIME_SLOTS.map((slot) => (
+              <option value="">
+                {noVisitingHours
+                  ? 'This doctor does not visit on that day'
+                  : doctorId && date
+                    ? 'Select a time'
+                    : 'Pick a doctor and date first'}
+              </option>
+              {slots.map((slot) => (
                 <option key={slot} value={slot} disabled={bookedTimes.includes(slot)}>
                   {slot} {bookedTimes.includes(slot) ? '(Booked)' : ''}
                 </option>
@@ -146,6 +169,12 @@ function MyAppointments() {
             </button>
           </div>
         </form>
+        {visiting && (
+          <p className="muted" style={{ marginTop: '14px', marginBottom: 0 }}>
+            This doctor visits on: {describeSchedule(visiting.schedule)}. A consultation fee of{' '}
+            {formatNaira(visiting.consultationFee)} is added to your bill when you check in at the front desk.
+          </p>
+        )}
         {error && (
           <p className="alert alert-error" role="alert" style={{ marginTop: '16px', marginBottom: 0 }}>
             {error}

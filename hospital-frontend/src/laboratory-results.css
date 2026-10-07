@@ -1,0 +1,788 @@
+/* =========================================================
+   Laboratory work queue and result entry (2F.3)
+   ========================================================= */
+
+.lab-queue-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.lab-filter-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lab-filter-tab {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.lab-filter-tab.is-active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #ffffff;
+}
+
+.lab-filter-count {
+  display: inline-block;
+  min-width: 22px;
+  margin-left: 4px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(127, 127, 127, 0.2);
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.lab-queue-search {
+  flex: 1 1 220px;
+  max-width: 340px;
+}
+
+.lab-queue-cards {
+  display: grid;
+  gap: 16px;
+}
+
+.lab-queue-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.lab-queue-card-badges {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.lab-queue-note {
+  margin: 8px 0;
+}
+
+.lab-queue-meta {
+  margin: 6px 0 0;
+  font-size: 0.9rem;
+}
+
+.lab-queue-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+/* =========================================================
+   Order status colours
+   ========================================================= */
+
+.lab-order-status.lab-order-status-pending {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+
+.lab-order-status.lab-order-status-collected {
+  background: var(--info-bg);
+  color: var(--info);
+}
+
+.lab-order-status.lab-order-status-in_progress {
+  background: var(--info-bg);
+  color: var(--info);
+}
+
+.lab-order-status.lab-order-status-completed {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+
+.lab-order-status.lab-order-status-cancelled {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+/* =========================================================
+   Result flags
+   ========================================================= */
+
+.lab-flag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+
+.lab-flag-normal {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+
+.lab-flag-high,
+.lab-flag-low,
+.lab-flag-abnormal {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+
+.lab-flag-critical {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+/* =========================================================
+   Result entry pop-up
+   ========================================================= */
+
+.lab-result-entry {
+  padding: 14px;
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+}
+
+.lab-result-entry-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.lab-result-entry-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 640px) {
+  .lab-result-entry-fields {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* =========================================================
+   2F.4 PATIENT LABORATORY VIEW
+   ========================================================= */
+
+.lab-patient-page {
+  width: 100%;
+}
+
+/* Page heading */
+
+.lab-patient-page-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.lab-patient-page-head .btn {
+  flex-shrink: 0;
+}
+
+/* =========================================================
+   Summary cards
+   ========================================================= */
+
+.lab-patient-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.lab-summary-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 92px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.lab-summary-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border-radius: 10px;
+  background: var(--primary-soft, rgba(37, 99, 235, 0.1));
+  font-size: 1.2rem;
+}
+
+.lab-summary-card span {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.lab-summary-card strong {
+  display: block;
+  color: var(--text);
+  font-size: 1.45rem;
+}
+
+/* =========================================================
+   Loading state
+   ========================================================= */
+
+.lab-patient-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 180px;
+  color: var(--muted);
+}
+
+.lab-loading-spinner {
+  width: 22px;
+  height: 22px;
+  border: 3px solid var(--line);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: lab-spinner 0.8s linear infinite;
+}
+
+@keyframes lab-spinner {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* =========================================================
+   Error state
+   ========================================================= */
+
+.lab-patient-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding: 15px 17px;
+  border: 1px solid var(--danger);
+  border-radius: 10px;
+  background: var(--danger-bg);
+  color: var(--text);
+}
+
+.lab-patient-error strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.lab-patient-error p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.lab-patient-error .btn {
+  flex-shrink: 0;
+}
+
+/* =========================================================
+   Empty state
+   ========================================================= */
+
+.lab-empty-state {
+  padding: 50px 24px;
+  text-align: center;
+}
+
+.lab-empty-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  background: var(--primary-soft, rgba(37, 99, 235, 0.1));
+  font-size: 1.6rem;
+}
+
+.lab-empty-state h2 {
+  margin: 0 0 8px;
+}
+
+.lab-empty-state p {
+  max-width: 560px;
+  margin: 0 auto;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+/* =========================================================
+   Patient order cards
+   ========================================================= */
+
+.lab-patient-orders {
+  display: grid;
+  gap: 20px;
+}
+
+.lab-patient-order-card {
+  overflow: hidden;
+}
+
+.lab-patient-order-completed {
+  border-left: 4px solid var(--ok);
+}
+
+.lab-patient-order-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.lab-patient-order-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.lab-patient-order-title-row h2 {
+  margin: 0;
+  font-size: 1.08rem;
+}
+
+.lab-patient-order-id {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.lab-order-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* =========================================================
+   Urgent priority
+   ========================================================= */
+
+.lab-priority-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* =========================================================
+   Order metadata
+   ========================================================= */
+
+.lab-patient-order-meta {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  padding: 18px 0;
+}
+
+.lab-patient-order-meta > div {
+  min-width: 0;
+}
+
+.lab-patient-order-meta span,
+.lab-patient-clinical-reason > span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.lab-patient-order-meta strong {
+  display: block;
+  color: var(--text);
+  font-size: 0.92rem;
+}
+
+/* =========================================================
+   Clinical reason
+   ========================================================= */
+
+.lab-patient-clinical-reason {
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--surface-alt, rgba(127, 127, 127, 0.06));
+}
+
+.lab-patient-clinical-reason p {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+/* =========================================================
+   Tests section
+   ========================================================= */
+
+.lab-patient-tests {
+  margin-top: 4px;
+}
+
+.lab-patient-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.lab-patient-section-title h3 {
+  margin: 0;
+  font-size: 0.98rem;
+}
+
+.lab-patient-section-title > span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+/* =========================================================
+   Pending / processing message
+   ========================================================= */
+
+.lab-patient-pending-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-alt, rgba(127, 127, 127, 0.06));
+}
+
+.lab-pending-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  border-radius: 50%;
+  background: var(--warn-bg);
+  font-size: 1.05rem;
+}
+
+.lab-patient-pending-message strong {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--text);
+}
+
+.lab-patient-pending-message p {
+  margin: 0 0 5px;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.lab-patient-pending-message > div:last-child > span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+/* =========================================================
+   Results table
+   ========================================================= */
+
+.lab-results-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.lab-results-table {
+  width: 100%;
+  min-width: 850px;
+  border-collapse: collapse;
+  background: var(--surface);
+}
+
+.lab-results-table th,
+.lab-results-table td {
+  padding: 12px 13px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.lab-results-table th {
+  background: var(--surface-alt, rgba(127, 127, 127, 0.06));
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.lab-results-table td {
+  color: var(--text);
+  font-size: 0.88rem;
+}
+
+.lab-results-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.lab-results-table tbody tr:hover {
+  background: var(--surface-alt, rgba(127, 127, 127, 0.035));
+}
+
+.lab-result-test-name strong {
+  display: block;
+  color: var(--text);
+}
+
+.lab-result-test-name span {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.lab-result-value {
+  font-size: 0.94rem;
+}
+
+.lab-result-comment {
+  display: block;
+  max-width: 230px;
+  line-height: 1.4;
+  white-space: normal;
+}
+
+/* =========================================================
+   Laboratory notes
+   ========================================================= */
+
+.lab-patient-lab-notes {
+  margin-top: 18px;
+  padding: 14px 16px;
+  border-radius: 9px;
+  background: var(--info-bg);
+}
+
+.lab-patient-lab-notes strong {
+  display: block;
+  margin-bottom: 5px;
+}
+
+.lab-patient-lab-notes p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* =========================================================
+   Result footer
+   ========================================================= */
+
+.lab-patient-result-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  padding-top: 13px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.lab-patient-result-footer strong {
+  color: var(--text);
+}
+
+/* =========================================================
+   Responsive patient laboratory view
+   ========================================================= */
+
+@media (max-width: 1000px) {
+  .lab-patient-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .lab-patient-order-meta {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .lab-patient-page-head {
+    align-items: stretch;
+  }
+
+  .lab-patient-page-head .btn {
+    width: 100%;
+  }
+
+  .lab-patient-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .lab-patient-order-header {
+    flex-direction: column;
+  }
+
+  .lab-patient-order-meta {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .lab-patient-pending-message {
+    flex-direction: column;
+  }
+
+  .lab-patient-result-footer {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .lab-patient-error {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .lab-patient-error .btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .lab-summary-card {
+    min-height: 80px;
+  }
+
+  .lab-patient-order-card {
+    padding: 14px;
+  }
+
+  .lab-patient-order-title-row h2 {
+    font-size: 1rem;
+  }
+
+  .lab-patient-pending-message {
+    padding: 14px;
+  }
+
+  /* =========================================================
+   2F.4 Critical laboratory result warning
+   ========================================================= */
+
+.lab-patient-order-has-critical {
+  border: 1px solid var(--danger);
+  border-left: 4px solid var(--danger);
+}
+
+.lab-critical-result-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0 0 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--danger);
+  border-radius: 9px;
+  background: var(--danger-bg);
+  color: var(--text);
+}
+
+.lab-critical-warning-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border-radius: 50%;
+  background: var(--danger);
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.lab-critical-result-warning strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--danger);
+  font-size: 0.95rem;
+}
+
+.lab-critical-result-warning p {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.5;
+  font-size: 0.87rem;
+}
+
+/* Highlight the specific critical result row */
+
+.lab-results-table tbody tr.lab-critical-result-row {
+  background: var(--danger-bg);
+}
+
+.lab-results-table tbody tr.lab-critical-result-row:hover {
+  background: var(--danger-bg);
+}
+
+.lab-results-table tbody tr.lab-critical-result-row .lab-result-value {
+  color: var(--danger);
+}
+
+@media (max-width: 600px) {
+  .lab-critical-result-warning {
+    padding: 12px;
+  }
+
+  .lab-critical-warning-icon {
+    width: 30px;
+    height: 30px;
+    flex-basis: 30px;
+  }
+}
+}

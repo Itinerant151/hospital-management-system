@@ -28,11 +28,21 @@ public class Bill {
     // HMO (health insurance) part of the bill
     private String hmoProvider;
     private String hmoMemberNumber;
-    private double hmoCoveredAmount;     // what the HMO is asked to pay
+    private double hmoCoveragePercent;   // share of the bill total the HMO covers (0 to 100)
+    private double hmoCoveredAmount;     // what the HMO is asked to pay (total x percent)
     private String claimStatus = "NONE"; // NONE, PENDING, APPROVED, PARTIALLY_APPROVED, REJECTED
+    private double hmoApprovedPercent;   // only used when the claim is partially approved
     private double hmoApprovedAmount;    // only used when the claim is partially approved
     private String claimNote;
     private LocalDateTime claimUpdatedAt;
+
+    // When the HMO actually pays its share
+    private boolean hmoPaid = false;
+    private double hmoPaidAmount;
+    private LocalDateTime hmoPaidAt;
+    private String hmoReceiptNumber;
+    private String hmoPaidBy;
+    private String hmoPaymentReference;
 
     // What the patient has paid so far
     private double amountPaid;
@@ -97,6 +107,12 @@ public class Bill {
         }
     }
 
+    /** What the HMO still has to pay. */
+    @Transient
+    public double getHmoBalance() {
+        return hmoPaid ? 0 : round(getHmoAmount());
+    }
+
     /** What the patient must pay out of pocket. */
     @Transient
     public double getPatientShare() {
@@ -115,7 +131,8 @@ public class Bill {
 
     public void recalculateStatus() {
         double balance = getBalance();
-        boolean waitingForHmo = "PENDING".equals(claimStatus) && getHmoAmount() > 0;
+        // The bill is only fully paid once the HMO has paid its share too
+        boolean waitingForHmo = !hmoPaid && getHmoAmount() > 0.005;
         if (balance <= 0.005) {
             status = waitingForHmo ? "AWAITING_HMO" : "PAID";
         } else if (amountPaid > 0.005) {
@@ -154,6 +171,22 @@ public class Bill {
     public void setHmoProvider(String hmoProvider) { this.hmoProvider = hmoProvider; }
     public String getHmoMemberNumber() { return hmoMemberNumber; }
     public void setHmoMemberNumber(String hmoMemberNumber) { this.hmoMemberNumber = hmoMemberNumber; }
+    public double getHmoCoveragePercent() { return hmoCoveragePercent; }
+    public void setHmoCoveragePercent(double hmoCoveragePercent) { this.hmoCoveragePercent = hmoCoveragePercent; }
+    public double getHmoApprovedPercent() { return hmoApprovedPercent; }
+    public void setHmoApprovedPercent(double hmoApprovedPercent) { this.hmoApprovedPercent = hmoApprovedPercent; }
+    public boolean isHmoPaid() { return hmoPaid; }
+    public void setHmoPaid(boolean hmoPaid) { this.hmoPaid = hmoPaid; }
+    public double getHmoPaidAmount() { return hmoPaidAmount; }
+    public void setHmoPaidAmount(double hmoPaidAmount) { this.hmoPaidAmount = hmoPaidAmount; }
+    public LocalDateTime getHmoPaidAt() { return hmoPaidAt; }
+    public void setHmoPaidAt(LocalDateTime hmoPaidAt) { this.hmoPaidAt = hmoPaidAt; }
+    public String getHmoReceiptNumber() { return hmoReceiptNumber; }
+    public void setHmoReceiptNumber(String hmoReceiptNumber) { this.hmoReceiptNumber = hmoReceiptNumber; }
+    public String getHmoPaidBy() { return hmoPaidBy; }
+    public void setHmoPaidBy(String hmoPaidBy) { this.hmoPaidBy = hmoPaidBy; }
+    public String getHmoPaymentReference() { return hmoPaymentReference; }
+    public void setHmoPaymentReference(String hmoPaymentReference) { this.hmoPaymentReference = hmoPaymentReference; }
     public double getHmoCoveredAmount() { return hmoCoveredAmount; }
     public void setHmoCoveredAmount(double hmoCoveredAmount) { this.hmoCoveredAmount = hmoCoveredAmount; }
     public String getClaimStatus() { return claimStatus; }

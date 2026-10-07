@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import api from './api';
 import { formatDateTime } from './format';
+import { formatNaira } from './currency';
+import { ALL_SLOTS, allowedTimes, describeSchedule } from './visiting';
 import SearchFilter from './SearchFilter';
 import { useConfirm } from './ConfirmDialog';
-
-const TIME_SLOTS = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
 
 function todayString() {
   const now = new Date();
@@ -24,6 +24,7 @@ function Appointments() {
   const [filtered, setFiltered] = useState([]);
   const [patients, setPatients] = useState([]);
   const [doctors, setDoctors] = useState([]);
+  const [visitingList, setVisitingList] = useState([]);
 
   const [patientId, setPatientId] = useState('');
   const [doctorId, setDoctorId] = useState('');
@@ -38,6 +39,7 @@ function Appointments() {
     fetchAppointments();
     fetchPatients();
     fetchDoctors();
+    fetchVisiting();
   }, []);
 
   useEffect(() => {
@@ -63,12 +65,22 @@ function Appointments() {
     setDoctors(response.data);
   };
 
+  const fetchVisiting = async () => {
+    const response = await api.get('/api/visiting-doctors');
+    setVisitingList(response.data);
+  };
+
   const fetchAvailability = async () => {
     const response = await api.get('/appointments/availability', {
       params: { doctorId, date },
     });
     setBookedTimes(response.data);
   };
+
+  // A visiting doctor only offers the hours in their weekly schedule
+  const visiting = visitingList.find((v) => v.doctorId === doctorId);
+  const slots = visiting ? allowedTimes(visiting, date) : ALL_SLOTS;
+  const noVisitingHours = Boolean(visiting && date && slots.length === 0);
 
   const addAppointment = async (e) => {
     e.preventDefault();
@@ -169,11 +181,14 @@ function Appointments() {
                 required
               >
                 <option value="">Select a doctor</option>
-                {doctors.map((doctor) => (
-                  <option key={doctor.id} value={doctor.id}>
-                    {doctor.name} ({doctor.specialization})
-                  </option>
-                ))}
+                {doctors.map((doctor) => {
+                  const v = visitingList.find((item) => item.doctorId === doctor.id);
+                  return (
+                    <option key={doctor.id} value={doctor.id} disabled={Boolean(v && !v.active)}>
+                      {doctor.name} ({doctor.specialization}){v ? (v.active ? ' - Visiting' : ' - Visiting, paused') : ''}
+                    </option>
+                  );
+                })}
               </select>
             </label>
 
@@ -197,10 +212,16 @@ function Appointments() {
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
                 required
-                disabled={!doctorId || !date}
+                disabled={!doctorId || !date || noVisitingHours}
               >
-                <option value="">{doctorId && date ? 'Select a time' : 'Pick a doctor and date first'}</option>
-                {TIME_SLOTS.map((slot) => (
+                <option value="">
+                  {noVisitingHours
+                    ? 'This doctor does not visit on that day'
+                    : doctorId && date
+                      ? 'Select a time'
+                      : 'Pick a doctor and date first'}
+                </option>
+                {slots.map((slot) => (
                   <option key={slot} value={slot} disabled={bookedTimes.includes(slot)}>
                     {slot} {bookedTimes.includes(slot) ? '(Booked)' : ''}
                   </option>
@@ -219,6 +240,12 @@ function Appointments() {
               </button>
             </div>
           </form>
+          {visiting && (
+            <p className="muted" style={{ marginTop: '14px', marginBottom: 0 }}>
+              Visiting doctor. Available: {describeSchedule(visiting.schedule)}. The consultation fee of{' '}
+              {formatNaira(visiting.consultationFee)} is billed when the patient checks in.
+            </p>
+          )}
           {error && (
             <p className="alert alert-error" role="alert" style={{ marginTop: '16px', marginBottom: 0 }}>
               {error}

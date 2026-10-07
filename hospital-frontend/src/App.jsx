@@ -7,6 +7,7 @@ import AdminPage from './AdminPage';
 import PatientPage from './PatientPage';
 import DoctorPage from './DoctorPage';
 import ReceptionistPage from './ReceptionistPage';
+import LaboratoryStaffPage from './LaboratoryStaffPage';
 
 // A password reset link looks like http://localhost:5173/?reset=TOKEN
 function getResetToken() {
@@ -84,6 +85,10 @@ function App() {
 
   if (role === 'RECEPTIONIST') {
     return <ReceptionistPage onLogout={handleLogout} />;
+  }
+
+  if (role === 'LAB_STAFF') {
+    return <LaboratoryStaffPage onLogout={handleLogout} />;
   }
 
   handleLogout();

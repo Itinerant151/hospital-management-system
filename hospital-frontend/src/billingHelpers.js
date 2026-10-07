@@ -40,3 +40,13 @@ export function lastReceipt(bill) {
   const payments = bill.payments || [];
   return payments.length ? payments[payments.length - 1].receiptNumber : null;
 }
+
+// 80 -> "80%", 12.5 -> "12.5%"
+export function percentText(value) {
+  const n = Number(value) || 0;
+  return `${Number.isInteger(n) ? n : n.toFixed(1)}%`;
+}
+
+// Has the HMO agreed to pay, but not paid yet?
+export const awaitingHmoPayment = (bill) =>
+  !bill.hmoPaid && (bill.claimStatus === 'APPROVED' || bill.claimStatus === 'PARTIALLY_APPROVED');

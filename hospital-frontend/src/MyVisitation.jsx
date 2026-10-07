@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react';
 import api from './api';
+import { useConfirm } from './ConfirmDialog';
+import { formatDateTime } from './format';
 
 const TIME_SLOTS = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
 
 function MyVisitation() {
+  const confirm = useConfirm();
   const [visits, setVisits] = useState([]);
+  const [visiting, setVisiting] = useState([]);
   const [visitorName, setVisitorName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [relation, setRelation] = useState('');
@@ -12,14 +16,18 @@ function MyVisitation() {
   const [timeSlot, setTimeSlot] = useState('');
   const [error, setError] = useState('');
 
+  const fetchVisits = async () => {
+    const [mine, making] = await Promise.all([
+      api.get('/api/visitation/mine'),
+      api.get('/api/visitation/mine-visiting'),
+    ]);
+    setVisits(mine.data);
+    setVisiting(making.data);
+  };
+
   useEffect(() => {
     fetchVisits();
   }, []);
-
-  const fetchVisits = async () => {
-    const response = await api.get('/api/visitation/mine');
-    setVisits(response.data);
-  };
 
   const bookVisit = async (e) => {
     e.preventDefault();
@@ -37,7 +45,7 @@ function MyVisitation() {
     }
   };
 
-    const cancelVisit = async (id) => {
+  const cancelVisit = async (id) => {
     if (!(await confirm('Cancel this visit?'))) return;
     await api.delete(`/api/visitation/${id}`);
     fetchVisits();
@@ -47,7 +55,7 @@ function MyVisitation() {
     <div>
       <div className="page-head">
         <h1>Visitation</h1>
-        <p>Book a visitor and see your scheduled visits.</p>
+        <p>Book a visitor, see who has visited you, and see the patients you have visited.</p>
       </div>
 
       <section className="panel">
@@ -94,7 +102,7 @@ function MyVisitation() {
       </section>
 
       <div className="list-head">
-        <h2>Your visits</h2>
+        <h2>Visits to me</h2>
         <span className="count">
           {visits.length} {visits.length === 1 ? 'visit' : 'visits'}
         </span>
@@ -114,7 +122,7 @@ function MyVisitation() {
             {visits.length === 0 && (
               <tr>
                 <td className="empty" colSpan="5">
-                  You have no visits scheduled yet.
+                  Nobody has visited or booked a visit yet.
                 </td>
               </tr>
             )}
@@ -125,14 +133,48 @@ function MyVisitation() {
                 <td>{visit.timeSlot}</td>
                 <td>{visit.status}</td>
                 <td>
-                  <button
-                    type="button"
-                    className="btn btn-danger btn-sm"
-                    onClick={() => cancelVisit(visit.id)}
-                  >
-                    Cancel
-                  </button>
+                  {visit.status === 'Scheduled' && (
+                    <button type="button" className="btn btn-danger btn-sm" onClick={() => cancelVisit(visit.id)}>
+                      Cancel
+                    </button>
+                  )}
                 </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="list-head" style={{ marginTop: '28px' }}>
+        <h2>Patients I have visited</h2>
+        <span className="count">
+          {visiting.length} {visiting.length === 1 ? 'visit' : 'visits'}
+        </span>
+      </div>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Patient visited</th>
+              <th>Came in</th>
+              <th>Left</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visiting.length === 0 && (
+              <tr>
+                <td className="empty" colSpan="4">
+                  The front desk has not logged any visits by you.
+                </td>
+              </tr>
+            )}
+            {visiting.map((visit) => (
+              <tr key={visit.id}>
+                <td>{visit.patientName || 'Another patient'}</td>
+                <td>{visit.checkInTime ? formatDateTime(visit.checkInTime) : `${visit.visitDate} ${visit.timeSlot}`}</td>
+                <td>{visit.checkOutTime ? formatDateTime(visit.checkOutTime) : <span className="muted">{visit.status === 'Checked In' ? 'Still in' : '—'}</span>}</td>
+                <td>{visit.status}</td>
               </tr>
             ))}
           </tbody>

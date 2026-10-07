@@ -1,0 +1,143 @@
+/* ---------- Laboratory ---------- */
+
+.laboratory-list-head {
+  align-items: center;
+}
+
+.laboratory-list-head > div:first-child {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.laboratory-toolbar {
+  margin-bottom: 16px;
+}
+
+.laboratory-toolbar input {
+  width: min(100%, 420px);
+}
+
+.laboratory-table {
+  min-width: 980px;
+}
+
+.laboratory-table td:first-child {
+  min-width: 220px;
+}
+
+.lab-description {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.lab-status {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.lab-status-active {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+
+.lab-status-inactive {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.lab-actions {
+  flex-wrap: wrap;
+}
+
+.laboratory-form {
+  padding-top: 4px;
+}
+
+.laboratory-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+}
+
+.lab-checkbox {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.lab-checkbox input {
+  width: 18px;
+  height: 18px;
+}
+
+.lab-toast {
+  position: fixed;
+  top: 22px;
+  right: 22px;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: min(460px, calc(100vw - 44px));
+  padding: 12px 14px 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+  box-shadow: 0 12px 32px rgba(6, 24, 32, 0.18);
+  font-weight: 600;
+}
+
+.lab-toast-success {
+  border-color: #b5e2d0;
+  color: var(--ok);
+}
+
+.lab-toast-error {
+  border-color: var(--danger-line);
+  color: var(--danger);
+}
+
+.lab-toast-close {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: currentColor;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.lab-toast-close:hover {
+  background: var(--paper);
+}
+
+@media (max-width: 700px) {
+  .laboratory-list-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .laboratory-list-head > div:first-child {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .lab-toast {
+    top: 12px;
+    right: 12px;
+    max-width: calc(100vw - 24px);
+  }
+}

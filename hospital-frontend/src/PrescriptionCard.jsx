@@ -13,6 +13,12 @@ function PrescriptionCard({ prescription, showPatient = false, showDoctor = true
             {issued ? formatDateTime(issued) : 'Date not recorded'}
             {showDoctor && prescription.doctorName ? ` · ${prescription.doctorName}` : ''}
           </div>
+          {prescription.updatedAt && (
+            <div className="rx-meta">
+              Edited {formatDateTime(prescription.updatedAt)}
+              {prescription.lastEditedBy ? ` by ${prescription.lastEditedBy}` : ''}
+            </div>
+          )}
         </div>
         <span className={`badge ${prescription.dispensed ? 'badge-completed' : 'badge-scheduled'}`}>
           {prescription.dispensed ? 'Dispensed' : 'Not dispensed'}

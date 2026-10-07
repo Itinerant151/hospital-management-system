@@ -19,6 +19,9 @@ public class AppointmentController {
     @Autowired
     private PatientRepository patientRepository;
 
+    @Autowired
+    private VisitingScheduleService visitingScheduleService;
+
     @GetMapping
     public List<Appointment> getAllAppointments() {
         return appointmentRepository.findAll();
@@ -63,6 +66,9 @@ public class AppointmentController {
         if (!patientRepository.existsById(appointment.getPatientId())) {
             throw new ApiException(404, "Patient not found.");
         }
+
+        // Visiting doctors can only be booked inside their weekly schedule
+        visitingScheduleService.checkBooking(appointment.getDoctorId(), appointment.getAppointmentDate());
 
         boolean clash = appointmentRepository.findByDoctorId(appointment.getDoctorId()).stream()
                 .anyMatch(a -> !"Cancelled".equals(a.getStatus())

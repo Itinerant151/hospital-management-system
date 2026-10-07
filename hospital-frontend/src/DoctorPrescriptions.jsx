@@ -4,14 +4,16 @@ import PrescriptionCard from './PrescriptionCard';
 
 const EMPTY_ITEM = { medicationName: '', dosage: '', duration: '', quantity: '', instructions: '' };
 
-// Doctors write prescriptions here and see the ones they have issued
+// Doctors write prescriptions here, and can edit the ones belonging to patients assigned to them
 function DoctorPrescriptions({ presetPatientId }) {
   const ownDoctorId = localStorage.getItem('doctorId');
 
-  const [patients, setPatients] = useState([]);
+  const [patients, setPatients] = useState([]);       // assigned patients plus emergency patients
+  const [assignedIds, setAssignedIds] = useState([]); // only the patients assigned to this doctor
   const [medicines, setMedicines] = useState([]);
-  const [issued, setIssued] = useState([]);
+  const [list, setList] = useState([]);
 
+  const [editingId, setEditingId] = useState(null);   // set while editing an existing prescription
   const [patientId, setPatientId] = useState(presetPatientId || '');
   const [items, setItems] = useState([{ ...EMPTY_ITEM }]);
   const [notes, setNotes] = useState('');
@@ -26,29 +28,54 @@ function DoctorPrescriptions({ presetPatientId }) {
         api.get('/api/medicines'),
       ]);
       const seen = new Set();
-      const combined = [...mine.data, ...emergency.data].filter((p) => !seen.has(p.id) && seen.add(p.id));
-      setPatients(combined);
+      setPatients([...mine.data, ...emergency.data].filter((p) => !seen.has(p.id) && seen.add(p.id)));
+      setAssignedIds(mine.data.map((p) => p.id));
       setMedicines(meds.data);
     };
     load().catch(() => setError('Could not load your patients. Check that the backend is running.'));
-    loadIssued();
+    loadList();
   }, []);
 
   useEffect(() => {
-    if (presetPatientId) setPatientId(presetPatientId);
+    if (presetPatientId && !editingId) setPatientId(presetPatientId);
   }, [presetPatientId]);
 
-  const loadIssued = async () => {
+  const loadList = async () => {
     try {
       const response = await api.get('/api/prescriptions/mine');
-      setIssued(response.data);
+      setList(response.data);
     } catch (err) {
-      setIssued([]);
+      setList([]);
     }
   };
 
   const updateItem = (index, field, value) =>
     setItems((prev) => prev.map((it, i) => (i === index ? { ...it, [field]: value } : it)));
+
+  const resetForm = () => {
+    setEditingId(null);
+    setPatientId('');
+    setItems([{ ...EMPTY_ITEM }]);
+    setNotes('');
+  };
+
+  const startEdit = (prescription) => {
+    setError('');
+    setMessage('');
+    setEditingId(prescription.id);
+    setPatientId(prescription.patientId);
+    setItems(
+      (prescription.items || []).map((it) => ({
+        medicationName: it.medicationName || '',
+        dosage: it.dosage || '',
+        duration: it.duration || '',
+        quantity: it.quantity ? String(it.quantity) : '',
+        instructions: it.instructions || '',
+      }))
+    );
+    setNotes(prescription.notes || '');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const submit = async (e) => {
     e.preventDefault();
@@ -88,14 +115,18 @@ function DoctorPrescriptions({ presetPatientId }) {
     };
 
     try {
-      await api.post('/api/prescriptions', body);
       const patient = patients.find((p) => p.id === patientId);
-      setMessage(`Prescription issued to ${patient ? patient.name : 'the patient'}. They can see it under My prescriptions.`);
-      setItems([{ ...EMPTY_ITEM }]);
-      setNotes('');
-      loadIssued();
+      if (editingId) {
+        await api.put(`/api/prescriptions/${editingId}`, body);
+        setMessage(`Prescription for ${patient ? patient.name : 'the patient'} updated.`);
+      } else {
+        await api.post('/api/prescriptions', body);
+        setMessage(`Prescription issued to ${patient ? patient.name : 'the patient'}. They can see it under My prescriptions.`);
+      }
+      resetForm();
+      loadList();
     } catch (err) {
-      setError(err.response?.data?.message || 'Could not issue the prescription.');
+      setError(err.response?.data?.message || 'Could not save the prescription.');
     }
   };
 
@@ -103,15 +134,20 @@ function DoctorPrescriptions({ presetPatientId }) {
     <div>
       <div className="page-head">
         <h1>Prescriptions</h1>
-        <p>Prescribe medication for your patients. They see it in their portal straight away.</p>
+        <p>Prescribe medication and edit prescriptions for the patients assigned to you. Patients see changes straight away.</p>
       </div>
 
-      <section className="panel">
-        <h2 className="panel-title">Write a prescription</h2>
+      <section className="panel prompt-card">
+        <div className="list-head">
+          <h2 className="panel-title">{editingId ? 'Edit prescription' : 'Write a prescription'}</h2>
+          {editingId && (
+            <button type="button" className="btn btn-quiet btn-sm" onClick={resetForm}>Cancel editing</button>
+          )}
+        </div>
         <form onSubmit={submit}>
           <label className="field" style={{ maxWidth: '360px', marginBottom: '16px' }}>
             <span>Patient</span>
-            <select value={patientId} onChange={(e) => setPatientId(e.target.value)} required>
+            <select value={patientId} onChange={(e) => setPatientId(e.target.value)} required disabled={Boolean(editingId)}>
               <option value="">Select a patient</option>
               {patients.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -131,38 +167,11 @@ function DoctorPrescriptions({ presetPatientId }) {
           </div>
           {items.map((item, i) => (
             <div className="rx-row" key={i}>
-              <input
-                type="text"
-                list="rx-medicines"
-                placeholder="e.g. Amoxicillin"
-                value={item.medicationName}
-                onChange={(e) => updateItem(i, 'medicationName', e.target.value)}
-              />
-              <input
-                type="text"
-                placeholder="500 mg, twice daily"
-                value={item.dosage}
-                onChange={(e) => updateItem(i, 'dosage', e.target.value)}
-              />
-              <input
-                type="text"
-                placeholder="5 days"
-                value={item.duration}
-                onChange={(e) => updateItem(i, 'duration', e.target.value)}
-              />
-              <input
-                type="number"
-                min="0"
-                placeholder="Qty"
-                value={item.quantity}
-                onChange={(e) => updateItem(i, 'quantity', e.target.value)}
-              />
-              <input
-                type="text"
-                placeholder="Take after meals"
-                value={item.instructions}
-                onChange={(e) => updateItem(i, 'instructions', e.target.value)}
-              />
+              <input type="text" list="rx-medicines" placeholder="e.g. Amoxicillin" value={item.medicationName} onChange={(e) => updateItem(i, 'medicationName', e.target.value)} />
+              <input type="text" placeholder="500 mg, twice daily" value={item.dosage} onChange={(e) => updateItem(i, 'dosage', e.target.value)} />
+              <input type="text" placeholder="5 days" value={item.duration} onChange={(e) => updateItem(i, 'duration', e.target.value)} />
+              <input type="number" min="0" placeholder="Qty" value={item.quantity} onChange={(e) => updateItem(i, 'quantity', e.target.value)} />
+              <input type="text" placeholder="Take after meals" value={item.instructions} onChange={(e) => updateItem(i, 'instructions', e.target.value)} />
               {items.length > 1 ? (
                 <button type="button" className="btn btn-quiet btn-sm" onClick={() => setItems((prev) => prev.filter((_, idx) => idx !== i))}>
                   Remove
@@ -190,7 +199,8 @@ function DoctorPrescriptions({ presetPatientId }) {
           </label>
 
           <div className="form-actions">
-            <button type="submit" className="btn btn-primary">Issue prescription</button>
+            <button type="submit" className="btn btn-primary">{editingId ? 'Save changes' : 'Issue prescription'}</button>
+            {editingId && <button type="button" className="btn btn-quiet" onClick={resetForm}>Cancel</button>}
           </div>
         </form>
         {error && <p className="alert alert-error" role="alert" style={{ marginTop: '16px', marginBottom: 0 }}>{error}</p>}
@@ -198,16 +208,27 @@ function DoctorPrescriptions({ presetPatientId }) {
       </section>
 
       <div className="list-head">
-        <h2>Prescriptions I have issued</h2>
-        <span className="count">{issued.length} {issued.length === 1 ? 'prescription' : 'prescriptions'}</span>
+        <h2>Prescriptions for my patients</h2>
+        <span className="count">{list.length} {list.length === 1 ? 'prescription' : 'prescriptions'}</span>
       </div>
-      {issued.length === 0 ? (
-        <p className="muted">You have not issued any prescriptions yet.</p>
+      {list.length === 0 ? (
+        <p className="muted">No prescriptions yet.</p>
       ) : (
         <div className="rx-grid">
-          {issued.map((prescription) => (
-            <PrescriptionCard key={prescription.id} prescription={prescription} showPatient showDoctor={false} />
-          ))}
+          {list.map((prescription) => {
+            const mine = assignedIds.includes(prescription.patientId);
+            return (
+              <PrescriptionCard key={prescription.id} prescription={prescription} showPatient>
+                {mine && !prescription.dispensed && (
+                  <button type="button" className="btn btn-quiet btn-sm" onClick={() => startEdit(prescription)}>
+                    Edit prescription
+                  </button>
+                )}
+                {mine && prescription.dispensed && <span className="muted">Dispensed, so it can no longer be edited.</span>}
+                {!mine && <span className="muted">View only: this patient is not assigned to you.</span>}
+              </PrescriptionCard>
+            );
+          })}
         </div>
       )}
     </div>

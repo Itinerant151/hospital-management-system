@@ -1,0 +1,122 @@
+/* ---------- Wards, beds and admissions ---------- */
+
+.tab-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+
+.pill-warn {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+
+.ward-block {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 20px 22px;
+  margin-bottom: 24px;
+}
+
+.ward-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+}
+
+.ward-head h2 {
+  font-size: 1.15rem;
+}
+
+.ward-meter {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--line-soft);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.ward-meter > span {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+}
+
+.bed-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.bed-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 104px;
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-left-width: 5px;
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.bed-available {
+  border-left-color: var(--ok);
+}
+
+.bed-occupied {
+  border-left-color: var(--primary);
+  background: var(--info-bg);
+}
+
+.bed-maintenance {
+  border-left-color: var(--warn);
+  background: var(--warn-bg);
+}
+
+.bed-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.bed-label {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.bed-patient {
+  font-size: 0.95rem;
+  overflow-wrap: anywhere;
+}
+
+.charge-total {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 4px 0;
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.stay-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stay-list li {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.stay-list li:last-child {
+  border-bottom: 0;
+}

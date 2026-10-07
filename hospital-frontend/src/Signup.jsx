@@ -28,7 +28,7 @@ function Signup({ onSignupSuccess }) {
         body.age = age;
         body.gender = gender;
       }
-      if (role === 'RECEPTIONIST') {
+      if (role === 'RECEPTIONIST' || role === 'LAB_STAFF') {
         body.name = name;
         body.phoneNumber = phoneNumber;
       }
@@ -38,8 +38,12 @@ function Signup({ onSignupSuccess }) {
         body.phoneNumber = phoneNumber;
       }
 
-      await api.post('/signup', body);
-      setSuccess('Account created. You can now log in.');
+      const response = await api.post('/signup', body);
+      setSuccess(
+        role === 'RECEPTIONIST' || role === 'LAB_STAFF'
+          ? (typeof response.data === 'string' && response.data) || 'Application submitted. An administrator must approve it before you can log in.'
+          : 'Account created. You can now log in.'
+      );
       setUsername('');
       setEmail('');
       setPassword('');
@@ -54,7 +58,7 @@ function Signup({ onSignupSuccess }) {
   };
 
   return (
-    <AuthLayout title="Create an account" subtitle="Choose whether you are a patient or a doctor.">
+    <AuthLayout title="Create an account" subtitle="Choose the role that matches you. Staff roles need administrator approval.">
       <form className="auth-form" onSubmit={handleSignup}>
         <label className="field">
           <span>I am a</span>
@@ -62,6 +66,7 @@ function Signup({ onSignupSuccess }) {
             <option value="PATIENT">Patient</option>
             <option value="DOCTOR">Doctor</option>
             <option value="RECEPTIONIST">Receptionist</option>
+            <option value="LAB_STAFF">Laboratory staff</option>
           </select>
         </label>
         <label className="field">
@@ -136,7 +141,7 @@ function Signup({ onSignupSuccess }) {
           </>
         )}
 
-        {role === 'RECEPTIONIST' && (
+        {(role === 'RECEPTIONIST' || role === 'LAB_STAFF') && (
           <label className="field">
             <span>Phone number</span>
             <input type="text" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} required />

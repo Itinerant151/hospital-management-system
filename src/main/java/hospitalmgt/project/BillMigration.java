@@ -7,8 +7,8 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 
 /**
- * Runs at startup. Gives bills created before HMO and partial payments existed
- * the new fields, and a payment record (so a receipt can be shown) if they were already paid.
+ * Runs at startup. Gives older bills the newer fields: payment records (so a receipt can be shown),
+ * the HMO coverage percentage, and the new "HMO has paid" rule.
  */
 @Component
 public class BillMigration implements CommandLineRunner {
@@ -44,6 +44,22 @@ public class BillMigration implements CommandLineRunner {
                 bill.getPayments().add(payment);
                 bill.setAmountPaid(bill.getTotal());
                 changed = true;
+            }
+
+            // Bills made when HMO cover was a fixed amount: work out the percentage, then re-check the status
+            if (bill.getHmoCoveredAmount() > 0) {
+                if (bill.getHmoCoveragePercent() <= 0 && bill.getTotal() > 0) {
+                    bill.setHmoCoveragePercent(Bill.round(bill.getHmoCoveredAmount() / bill.getTotal() * 100.0));
+                    changed = true;
+                }
+                if ("PARTIALLY_APPROVED".equals(bill.getClaimStatus())
+                        && bill.getHmoApprovedPercent() <= 0 && bill.getTotal() > 0) {
+                    bill.setHmoApprovedPercent(Bill.round(bill.getHmoApprovedAmount() / bill.getTotal() * 100.0));
+                    changed = true;
+                }
+                String before = bill.getStatus();
+                bill.recalculateStatus();
+                if (!before.equals(bill.getStatus())) changed = true;
             }
 
             if (changed) {

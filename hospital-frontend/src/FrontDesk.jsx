@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import api from './api';
 import SearchFilter from './SearchFilter';
 import { formatDateTime } from './format';
+import { formatNaira } from './currency';
+import { dayKeyOf } from './visiting';
 
 function todayKey() {
   const now = new Date();
@@ -14,6 +16,7 @@ function FrontDesk() {
   const [appointments, setAppointments] = useState([]);
   const [patients, setPatients] = useState([]);
   const [doctors, setDoctors] = useState([]);
+  const [visiting, setVisiting] = useState([]);
   const [visits, setVisits] = useState([]);
   const [bills, setBills] = useState([]);
   const [log, setLog] = useState([]);
@@ -33,10 +36,11 @@ function FrontDesk() {
 
   const loadAll = async () => {
     try {
-      const [apptRes, patientRes, doctorRes, visitRes, billRes, logRes] = await Promise.all([
+      const [apptRes, patientRes, doctorRes, visitingRes, visitRes, billRes, logRes] = await Promise.all([
         api.get('/appointments'),
         api.get('/patients'),
         api.get('/doctors'),
+        api.get('/api/visiting-doctors'),
         api.get('/api/visitation'),
         api.get('/api/bills'),
         api.get('/api/frontdesk'),
@@ -44,6 +48,7 @@ function FrontDesk() {
       setAppointments(apptRes.data);
       setPatients(patientRes.data);
       setDoctors(doctorRes.data);
+      setVisiting(visitingRes.data);
       setVisits(visitRes.data);
       setBills(billRes.data);
       setLog(logRes.data);
@@ -69,6 +74,7 @@ function FrontDesk() {
 
   const patientName = (id) => patients.find((p) => p.id === id)?.name || 'Unknown';
   const doctorName = (id) => doctors.find((d) => d.id === id)?.name || 'Unknown';
+  const visitingFor = (doctorId) => visiting.find((v) => v.doctorId === doctorId);
 
   const today = todayKey();
 
@@ -79,6 +85,15 @@ function FrontDesk() {
         .sort((a, b) => a.appointmentDate.localeCompare(b.appointmentDate)),
     [appointments, today]
   );
+
+  // Visiting doctors who are due in today
+  const visitingToday = useMemo(() => {
+    const day = dayKeyOf(today);
+    return visiting
+      .filter((v) => v.active)
+      .map((v) => ({ ...v, window: (v.schedule || []).find((s) => s.day === day) }))
+      .filter((v) => v.window);
+  }, [visiting, today]);
 
   const visibleLog = useMemo(
     () =>
@@ -94,8 +109,13 @@ function FrontDesk() {
   const visitorsIn = visits.filter((v) => v.status === 'Checked In').length;
   const unpaidBills = bills.filter((b) => b.status !== 'PAID').length;
 
-  const checkInFromAppointment = (appt) =>
-    act(
+  // The open check-in record of a visiting doctor, if they are in the building
+  const entryForDoctor = (doctorId) =>
+    log.find((e) => e.type === 'STAFF' && e.status === 'Checked In' && e.personId === doctorId);
+
+  const checkInFromAppointment = (appt) => {
+    const v = visitingFor(appt.doctorId);
+    return act(
       () =>
         api.post('/api/frontdesk/check-in', {
           type: 'PATIENT',
@@ -103,7 +123,21 @@ function FrontDesk() {
           appointmentId: appt.id,
           purpose: `Appointment with ${doctorName(appt.doctorId)}`,
         }),
-      `${patientName(appt.patientId)} checked in.`
+      `${patientName(appt.patientId)} checked in.` +
+        (v ? ` A consultation fee bill of ${formatNaira(v.consultationFee)} was created.` : '')
+    );
+  };
+
+  const checkInVisitingDoctor = (v) =>
+    act(
+      () =>
+        api.post('/api/frontdesk/check-in', {
+          type: 'STAFF',
+          personId: v.doctorId,
+          personName: v.name,
+          purpose: `Visiting clinic ${v.window.startTime}-${v.window.endTime}`,
+        }),
+      `${v.name} checked in.`
     );
 
   const checkOut = (entry) =>
@@ -149,6 +183,48 @@ function FrontDesk() {
       </div>
 
       <div className="list-head">
+        <h2>Visiting doctors today</h2>
+        <span className="count">{visitingToday.length} {visitingToday.length === 1 ? 'doctor' : 'doctors'}</span>
+      </div>
+      <div className="table-wrap" style={{ marginBottom: '28px' }}>
+        <table>
+          <thead>
+            <tr><th>Doctor</th><th>Hours today</th><th>Fee</th><th>Arrival</th></tr>
+          </thead>
+          <tbody>
+            {visitingToday.length === 0 && (
+              <tr><td className="empty" colSpan="4">No visiting doctors are due in today.</td></tr>
+            )}
+            {visitingToday.map((v) => {
+              const entry = entryForDoctor(v.doctorId);
+              return (
+                <tr key={v.id}>
+                  <td>{v.name}<br /><span className="muted">{v.specialization}</span></td>
+                  <td>{v.window.startTime} to {v.window.endTime}</td>
+                  <td>{formatNaira(v.consultationFee)}</td>
+                  <td>
+                    {!entry && (
+                      <button type="button" className="btn btn-primary btn-sm" onClick={() => checkInVisitingDoctor(v)}>
+                        Check in
+                      </button>
+                    )}
+                    {entry && (
+                      <div className="row-actions">
+                        <span className="pill pill-in">Checked in</span>
+                        <button type="button" className="btn btn-quiet btn-sm" onClick={() => checkOut(entry)}>
+                          Check out
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="list-head">
         <h2>Today's appointments</h2>
         <span className="count">{todaysAppointments.length} {todaysAppointments.length === 1 ? 'appointment' : 'appointments'}</span>
       </div>
@@ -163,11 +239,23 @@ function FrontDesk() {
             )}
             {todaysAppointments.map((appt) => {
               const entry = entryForAppointment(appt);
+              const v = visitingFor(appt.doctorId);
               return (
                 <tr key={appt.id}>
                   <td>{(appt.appointmentDate || '').substring(11, 16)}</td>
                   <td>{patientName(appt.patientId)}</td>
-                  <td>{doctorName(appt.doctorId)}</td>
+                  <td>
+                    {doctorName(appt.doctorId)}
+                    {v && (
+                      <>
+                        <br />
+                        <span className="muted">
+                          Visiting, fee {formatNaira(v.consultationFee)}
+                          {!entryForDoctor(appt.doctorId) ? ', not checked in yet' : ''}
+                        </span>
+                      </>
+                    )}
+                  </td>
                   <td>{appt.reason}</td>
                   <td>
                     {!entry && (
