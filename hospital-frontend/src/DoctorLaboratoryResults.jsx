@@ -3,6 +3,7 @@ import api from './api';
 import Overlay from './Overlay';
 import PatientTimeline from './PatientTimeline';
 import './laboratory-orders.css';
+import LabReport from './LabReport';
 
 const FLAG_CONFIG = {
   NORMAL: {
@@ -81,6 +82,7 @@ function DoctorLaboratoryResults({ presetPatientId = '' }) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('ALL');
   const [historyFor, setHistoryFor] = useState(null);
+  const [reportOrderId, setReportOrderId] = useState(null);
 
   const loadResults = useCallback(async (isRefresh = false) => {
     if (isRefresh) {
@@ -628,6 +630,14 @@ function DoctorLaboratoryResults({ presetPatientId = '' }) {
                           </strong>
                         </span>
 
+                                                <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => setReportOrderId(order.id)}
+                        >
+                          View / print report
+                        </button>
+
                         <span>
                           Completed{' '}
                           {formatDateTime(
@@ -656,6 +666,9 @@ function DoctorLaboratoryResults({ presetPatientId = '' }) {
             patientId={historyFor.id}
           />
         </Overlay>
+      )}
+            {reportOrderId && (
+        <LabReport orderId={reportOrderId} onClose={() => setReportOrderId(null)} />
       )}
     </div>
   );

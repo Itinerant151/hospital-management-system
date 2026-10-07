@@ -20,17 +20,20 @@ public class LaboratoryOrderController {
     private final LaboratoryTestRepository laboratoryTestRepository;
     private final PatientRepository patientRepository;
     private final DoctorRepository doctorRepository;
+    private final LaboratoryBillingService laboratoryBillingService;
 
     public LaboratoryOrderController(
             LaboratoryOrderRepository laboratoryOrderRepository,
             LaboratoryTestRepository laboratoryTestRepository,
             PatientRepository patientRepository,
-            DoctorRepository doctorRepository
+            DoctorRepository doctorRepository,
+            LaboratoryBillingService laboratoryBillingService
     ) {
         this.laboratoryOrderRepository = laboratoryOrderRepository;
         this.laboratoryTestRepository = laboratoryTestRepository;
         this.patientRepository = patientRepository;
         this.doctorRepository = doctorRepository;
+        this.laboratoryBillingService = laboratoryBillingService;
     }
 
     // ---------- doctor side ----------
@@ -197,6 +200,9 @@ public class LaboratoryOrderController {
 
         LaboratoryOrder saved =
                 laboratoryOrderRepository.save(order);
+
+        // 2F.6: bill the patient for the ordered tests
+        laboratoryBillingService.billOrder(saved);
 
         request.setAttribute(
                 "auditDetail",

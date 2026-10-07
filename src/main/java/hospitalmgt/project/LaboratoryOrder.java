@@ -43,6 +43,8 @@ public class LaboratoryOrder {
     private LocalDateTime completedAt;
     private String completedBy;
     private String labNotes;
+    private String billId;
+
 
     public LaboratoryOrder() {
     }
@@ -100,6 +102,9 @@ public class LaboratoryOrder {
 
     public String getLabNotes() { return labNotes; }
     public void setLabNotes(String labNotes) { this.labNotes = labNotes; }
+
+    public String getBillId() { return billId; }
+    public void setBillId(String billId) { this.billId = billId; }
 
     public static class LaboratoryOrderItem {
 

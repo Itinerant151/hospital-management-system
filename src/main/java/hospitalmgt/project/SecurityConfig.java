@@ -97,6 +97,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/laboratory/orders/*/collect").hasRole("LAB_STAFF")
                         .requestMatchers(HttpMethod.PUT, "/api/laboratory/orders/*/results").hasRole("LAB_STAFF")
                         .requestMatchers(HttpMethod.PUT, "/api/laboratory/orders/*/complete").hasRole("LAB_STAFF")
+                        .requestMatchers(HttpMethod.GET, "/api/laboratory/orders/*/report").hasAnyRole("PATIENT", "DOCTOR", "LAB_STAFF", "ADMIN")
 
                         /*
                          * Keep all other laboratory endpoints protected.
@@ -132,6 +133,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/reminders/inbox/**").hasAnyRole("PATIENT", "DOCTOR", "ADMIN", "RECEPTIONIST")
                         .requestMatchers(HttpMethod.PUT, "/api/reminders/*/read").hasAnyRole("PATIENT", "DOCTOR", "ADMIN", "RECEPTIONIST")
                         .requestMatchers("/api/reminders/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/bills/*/hmo").hasAnyRole("ADMIN", "RECEPTIONIST")
                         .requestMatchers(HttpMethod.GET, "/api/bills/mine").hasRole("PATIENT")
                         .requestMatchers(HttpMethod.GET, "/api/bills/patient/**").hasAnyRole("PATIENT", "DOCTOR", "ADMIN", "RECEPTIONIST")
                         .requestMatchers(HttpMethod.GET, "/api/bills").hasAnyRole("ADMIN", "RECEPTIONIST")

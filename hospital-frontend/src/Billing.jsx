@@ -5,6 +5,7 @@ import { formatNaira } from './currency';
 import Receipt from './Receipt';
 import HmoReceipt from './HmoReceipt';
 import HmoActions from './HmoActions';
+import BillHmoEditor from './BillHmoEditor';
 import { STAFF_METHODS, statusBadge, statusLabel, claimBadge, claimLabel, lastReceipt, percentText } from './billingHelpers';
 
 const EMPTY_ITEMS = [{ description: '', amount: '' }];
@@ -326,6 +327,7 @@ function Billing() {
                       </button>
                     )}
                     <HmoActions bill={bill} onChanged={fetchBills} onShowReceipt={setHmoReceiptFor} />
+                    <BillHmoEditor bill={bill} patient={patients.find((p) => p.id === bill.patientId)} onChanged={fetchBills} />
                     {role === 'ADMIN' && (
                       <button type="button" className="btn btn-danger btn-sm" onClick={() => deleteBill(bill.id)}>
                         Delete

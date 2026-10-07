@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import api from './api';
 import './laboratory-results.css';
+import LabReport from './LabReport';
 
 const STATUS_CONFIG = {
   PENDING: {
@@ -104,6 +105,7 @@ function MyLabResults() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [reportOrderId, setReportOrderId] = useState(null);
 
   const loadResults = useCallback(async (isRefresh = false) => {
     if (isRefresh) {
@@ -115,7 +117,7 @@ function MyLabResults() {
     setError('');
 
     try {
-      const response = await api.get('/laboratory/orders/my-results');
+      const response = await api.get('/api/laboratory/orders/my-results');
 
       const data = Array.isArray(response.data) ? response.data : [];
 
@@ -485,6 +487,14 @@ function MyLabResults() {
                           These results are read-only and cannot be edited from
                           the patient portal.
                         </span>
+
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => setReportOrderId(order.id)}
+                        >
+                          View / print report
+                        </button>
                       </div>
                     )}
                   </article>
@@ -493,6 +503,13 @@ function MyLabResults() {
             </div>
           )}
         </>
+      )}
+
+      {reportOrderId && (
+        <LabReport
+          orderId={reportOrderId}
+          onClose={() => setReportOrderId(null)}
+        />
       )}
     </div>
   );

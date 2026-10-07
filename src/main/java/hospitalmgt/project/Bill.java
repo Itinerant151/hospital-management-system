@@ -16,6 +16,7 @@ public class Bill {
 
     private String patientId;
     private String appointmentId; // optional link back to an appointment
+    private String laboratoryOrderId; // optional link back to a laboratory order
     private List<BillItem> items;
     private double total;
     // PENDING, PARTIALLY_PAID, AWAITING_HMO or PAID (always worked out by recalculateStatus)
@@ -153,6 +154,8 @@ public class Bill {
     public void setPatientId(String patientId) { this.patientId = patientId; }
     public String getAppointmentId() { return appointmentId; }
     public void setAppointmentId(String appointmentId) { this.appointmentId = appointmentId; }
+    public String getLaboratoryOrderId() { return laboratoryOrderId; }
+    public void setLaboratoryOrderId(String laboratoryOrderId) { this.laboratoryOrderId = laboratoryOrderId; }
     public List<BillItem> getItems() { return items; }
     public void setItems(List<BillItem> items) { this.items = items; }
     public double getTotal() { return total; }
