@@ -73,7 +73,7 @@ function HmoReceipt({ billId, onClose }) {
             <div className="receipt-foot">
               <div>Bill status: <strong>{statusLabel(receipt.status)}</strong></div>
               <div>Recorded by: {receipt.receivedBy || '—'}</div>
-              <div className="receipt-demo">Demo receipt. No real money was moved.</div>
+              <div className="receipt-demo">Thank you. Please keep this receipt for your records.</div>
             </div>
           </div>
 

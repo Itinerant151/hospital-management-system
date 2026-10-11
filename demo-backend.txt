@@ -1,0 +1,12 @@
+src\main\java\hospitalmgt\project\BillController.java:21:    private static final List<String> METHODS = List.of("Cash", "Card", "Bank Transfer", "Demo");
+src\main\java\hospitalmgt\project\BillController.java:113:    // Records a payment by the patient. No amount means "pay the whole balance". Demo only: no real gateway.
+src\main\java\hospitalmgt\project\BillController.java:130:        String method = "Demo";
+src\main\java\hospitalmgt\project\BillMigration.java:40:                payment.setMethod("Demo");
+src\main\java\hospitalmgt\project\Reminder.java:14:    private String recipientEmail; // demo only — logged, not actually emailed
+src\main\java\hospitalmgt\project\ReminderController.java:19:    // Manually trigger reminder generation now (handy for demoing without waiting on the schedule)
+src\main\java\hospitalmgt\project\ReminderController.java:37:    // Manually create a demo reminder (handy for demoing without waiting on the schedule)
+src\main\java\hospitalmgt\project\ReminderScheduler.java:10: * Runs every hour and generates demo reminders for any "Scheduled" appointment
+src\main\java\hospitalmgt\project\ReminderScheduler.java:11: * that hasn't had a reminder sent yet. This is demo-only: reminders are just
+src\main\java\hospitalmgt\project\ReminderScheduler.java:16: * for demoing without waiting on the schedule.
+src\main\java\hospitalmgt\project\ResetLinkSender.java:7: * DEMO MODE: prints the reset link in the backend console instead of emailing it.
+src\main\java\hospitalmgt\project\ResetLinkSender.java:22:        System.out.println("=========== PASSWORD RESET (demo mode) ===========");

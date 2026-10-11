@@ -1,0 +1,9 @@
+src\features.css:233:.receipt-demo {
+src\HmoReceipt.jsx:8:// On-screen receipt for the payment the HMO made. "Print Receipt" opens the browser's print window (demo).
+src\HmoReceipt.jsx:76:              <div className="receipt-demo">Demo receipt. No real money was moved.</div>
+src\MyBilling.jsx:38:      setMessage('Demo payment successful.');
+src\MyBilling.jsx:80:              <button type="submit" className="btn btn-primary">Pay now (demo)</button>
+src\Notifications.jsx:4:// Demo-only reminders: shown here instead of being emailed anywhere.
+src\Notifications.jsx:46:            ? 'System-wide demo reminders. These are logged here only, not actually emailed.'
+src\Receipt.jsx:8:// On-screen receipt for one payment. "Print Receipt" opens the browser's print window (demo feature).
+src\Receipt.jsx:73:              <div className="receipt-demo">Demo receipt. No real money was moved.</div>

@@ -35,7 +35,7 @@ function MyBilling() {
     try {
       const response = await api.post(`/api/bills/${paying.id}/pay`, { amount: Number(amount), method });
       setPaying(null);
-      setMessage('Demo payment successful.');
+      setMessage('Payment successful.');
       await load();
       setReceipt({ billId: response.data.id, payment: lastReceipt(response.data) });
     } catch (err) {
@@ -77,7 +77,7 @@ function MyBilling() {
               </select>
             </label>
             <div className="form-actions">
-              <button type="submit" className="btn btn-primary">Pay now (demo)</button>
+              <button type="submit" className="btn btn-primary">Pay now</button>
               <button type="button" className="btn btn-quiet" onClick={() => setPaying(null)}>Cancel</button>
             </div>
           </form>

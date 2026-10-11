@@ -43,7 +43,7 @@ function Notifications() {
         <h1>{isAdmin ? 'Reminder log' : 'Notifications'}</h1>
         <p>
           {isAdmin
-            ? 'System-wide demo reminders. These are logged here only, not actually emailed.'
+            ? 'System-wide reminders.'
             : 'Reminders about your upcoming appointments.'}
         </p>
       </div>

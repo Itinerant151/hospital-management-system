@@ -3,6 +3,58 @@ import api from './api';
 import AuthLayout from './AuthLayout';
 import PasswordField from './PasswordField';
 
+// Letters (any language) with single spaces, hyphens or apostrophes between names.
+// Allows "Abdur-Rasheed" and "O'Neil", rejects digits and symbols.
+const NAME_PATTERN = /^\p{L}+(?:[ '-]\p{L}+)*$/u;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const PHONE_PATTERN = /^\+?\d{7,15}$/;
+
+function validateName(value) {
+  const v = value.trim();
+  if (!v) return 'Enter your full name.';
+  if (v.length < 2) return 'That name is too short.';
+  if (!NAME_PATTERN.test(v)) {
+    return 'Use letters only. Spaces, hyphens and apostrophes between names are fine.';
+  }
+  return '';
+}
+
+function validateEmail(value) {
+  const v = value.trim();
+  if (!v) return 'Enter your email address.';
+  if (!EMAIL_PATTERN.test(v)) return 'Enter a valid email address, like name@example.com.';
+  return '';
+}
+
+function validatePhone(value) {
+  const v = value.replace(/[\s-]/g, '');
+  if (!v) return 'Enter your phone number.';
+  if (!PHONE_PATTERN.test(v)) return 'Enter a valid phone number (digits only, optional + at the start).';
+  return '';
+}
+
+function describeError(err) {
+  if (!err.response) {
+    return 'Cannot reach the server. Check that the backend is running and try again.';
+  }
+  const data = err.response.data;
+  const serverMessage =
+    (data && typeof data === 'object' && data.message) || (typeof data === 'string' ? data : '');
+  if (serverMessage) return serverMessage;
+  switch (err.response.status) {
+    case 400:
+      return 'Some of the details are not valid. Check them and try again.';
+    case 409:
+      return 'That username or email is already registered.';
+    case 500:
+      return 'The server had a problem. Try again in a moment.';
+    default:
+      return `Signup failed (error ${err.response.status}).`;
+  }
+}
+
+const errorStyle = { color: '#d93025', display: 'block', marginTop: 4 };
+
 function Signup({ onSignupSuccess }) {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -13,29 +65,53 @@ function Signup({ onSignupSuccess }) {
   const [gender, setGender] = useState('');
   const [specialization, setSpecialization] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const setFieldError = (field, message) =>
+    setFieldErrors((prev) => ({ ...prev, [field]: message }));
+
+  const needsPhone = role === 'DOCTOR' || role === 'RECEPTIONIST' || role === 'LAB_STAFF';
 
   const handleSignup = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
 
+    const cleanName = name.trim().replace(/\s+/g, ' ');
+    const cleanUsername = username.trim();
+    const cleanEmail = email.trim();
+    const cleanPhone = phoneNumber.replace(/[\s-]/g, '');
+
+    const errors = {
+      name: validateName(cleanName),
+      email: validateEmail(cleanEmail),
+      phone: needsPhone ? validatePhone(phoneNumber) : '',
+    };
+    setFieldErrors(errors);
+    if (errors.name || errors.email || errors.phone) {
+      setError('Please fix the highlighted fields and try again.');
+      return;
+    }
+
+    setSubmitting(true);
     try {
-      const body = { username, email, password, role };
+      const body = { username: cleanUsername, email: cleanEmail, password, role };
       if (role === 'PATIENT') {
-        body.name = name;
+        body.name = cleanName;
         body.age = age;
         body.gender = gender;
       }
       if (role === 'RECEPTIONIST' || role === 'LAB_STAFF') {
-        body.name = name;
-        body.phoneNumber = phoneNumber;
+        body.name = cleanName;
+        body.phoneNumber = cleanPhone;
       }
       if (role === 'DOCTOR') {
-        body.name = name;
-        body.specialization = specialization;
-        body.phoneNumber = phoneNumber;
+        body.name = cleanName;
+        body.specialization = specialization.trim();
+        body.phoneNumber = cleanPhone;
       }
 
       const response = await api.post('/signup', body);
@@ -52,8 +128,11 @@ function Signup({ onSignupSuccess }) {
       setGender('');
       setSpecialization('');
       setPhoneNumber('');
+      setFieldErrors({});
     } catch (err) {
-      setError(err.response?.data?.message || 'Signup failed');
+      setError(describeError(err));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -62,7 +141,7 @@ function Signup({ onSignupSuccess }) {
       <form className="auth-form" onSubmit={handleSignup}>
         <label className="field">
           <span>I am a</span>
-          <select value={role} onChange={(e) => setRole(e.target.value)}>
+          <select value={role} onChange={(e) => { setRole(e.target.value); setFieldErrors({}); }}>
             <option value="PATIENT">Patient</option>
             <option value="DOCTOR">Doctor</option>
             <option value="RECEPTIONIST">Receptionist</option>
@@ -86,9 +165,11 @@ function Signup({ onSignupSuccess }) {
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            onBlur={() => email && setFieldError('email', validateEmail(email))}
             required
           />
           <small className="field-hint">Used to reset your password if you forget it.</small>
+          {fieldErrors.email && <small style={errorStyle}>{fieldErrors.email}</small>}
         </label>
         <PasswordField
           value={password}
@@ -100,7 +181,19 @@ function Signup({ onSignupSuccess }) {
         />
         <label className="field">
           <span>Full name</span>
-          <input type="text" value={name} onChange={(e) => setName(e.target.value)} required />
+          <input
+            type="text"
+            maxLength={60}
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value);
+              if (fieldErrors.name) setFieldError('name', validateName(e.target.value));
+            }}
+            onBlur={() => name && setFieldError('name', validateName(name))}
+            required
+          />
+          <small className="field-hint">Letters only, for example Jane Doe or Abdur-Rasheed.</small>
+          {fieldErrors.name && <small style={errorStyle}>{fieldErrors.name}</small>}
         </label>
 
         {role === 'PATIENT' && (
@@ -129,22 +222,24 @@ function Signup({ onSignupSuccess }) {
         )}
 
         {role === 'DOCTOR' && (
-          <>
-            <label className="field">
-              <span>Specialization</span>
-              <input type="text" value={specialization} onChange={(e) => setSpecialization(e.target.value)} required />
-            </label>
-            <label className="field">
-              <span>Phone number</span>
-              <input type="text" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} required />
-            </label>
-          </>
+          <label className="field">
+            <span>Specialization</span>
+            <input type="text" value={specialization} onChange={(e) => setSpecialization(e.target.value)} required />
+          </label>
         )}
 
-        {(role === 'RECEPTIONIST' || role === 'LAB_STAFF') && (
+        {needsPhone && (
           <label className="field">
             <span>Phone number</span>
-            <input type="text" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} required />
+            <input
+              type="text"
+              inputMode="tel"
+              value={phoneNumber}
+              onChange={(e) => setPhoneNumber(e.target.value)}
+              onBlur={() => phoneNumber && setFieldError('phone', validatePhone(phoneNumber))}
+              required
+            />
+            {fieldErrors.phone && <small style={errorStyle}>{fieldErrors.phone}</small>}
           </label>
         )}
 
@@ -155,8 +250,8 @@ function Signup({ onSignupSuccess }) {
         )}
         {success && <p className="alert alert-success">{success}</p>}
 
-        <button type="submit" className="btn btn-primary">
-          Create account
+        <button type="submit" className="btn btn-primary" disabled={submitting}>
+          {submitting ? 'Creating account...' : 'Create account'}
         </button>
       </form>
       <p className="auth-switch">

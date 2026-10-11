@@ -7,9 +7,14 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 @RestController
 public class AuthController {
+
+    // Letters (any language) with single spaces, hyphens or apostrophes between names
+    private static final Pattern NAME_PATTERN = Pattern.compile("^\\p{L}+(?:[ '-]\\p{L}+)*$");
+    private static final Pattern PHONE_PATTERN = Pattern.compile("^\\+?\\d{7,15}$");
 
     @Autowired
     private UserRepository userRepository;
@@ -26,6 +31,31 @@ public class AuthController {
     @Autowired
     private JwtUtil jwtUtil;
 
+    @Autowired
+    private EmailVerificationController emailVerification;
+
+    private String cleanPersonName(String raw) {
+        String n = raw == null ? "" : raw.trim().replaceAll("\\s+", " ");
+        if (n.length() < 2) {
+            throw new ApiException(400, "Enter your full name (at least 2 letters).");
+        }
+        if (n.length() > 60) {
+            throw new ApiException(400, "That name is too long (60 characters at most).");
+        }
+        if (!NAME_PATTERN.matcher(n).matches()) {
+            throw new ApiException(400, "Names can only contain letters, spaces, hyphens and apostrophes.");
+        }
+        return n;
+    }
+
+    private String cleanPhone(String raw) {
+        String p = raw == null ? "" : raw.replaceAll("[\\s-]", "");
+        if (!PHONE_PATTERN.matcher(p).matches()) {
+            throw new ApiException(400, "Enter a valid phone number (digits only, optional + at the start).");
+        }
+        return p;
+    }
+
     @PostMapping("/login")
     public Map<String, String> login(@RequestBody Map<String, String> body, HttpServletRequest request) {
         String username = body.get("username");
@@ -38,6 +68,13 @@ public class AuthController {
             request.setAttribute("auditDetail", "Failed login attempt");
             request.setAttribute("auditAlways", true);
             throw new ApiException(401, "Invalid username or password");
+        }
+        if (!user.isEmailVerified()) {
+            request.setAttribute("auditActor", user.getUsername());
+            request.setAttribute("auditDetail", "Login blocked: email not verified yet");
+            request.setAttribute("auditAlways", true);
+            throw new ApiException(403, "Please verify your email first. Enter the code we sent you, "
+                    + "or get a new one at " + emailVerification.resendPageUrl());
         }
         if (!user.isApproved()) {
             String applied = "LAB_STAFF".equals(user.getRequestedRole()) ? "laboratory staff" : "receptionist";
@@ -72,6 +109,9 @@ public class AuthController {
         String password = body.get("password");
         AccountRules.checkPassword(password);
         String email = AccountRules.cleanEmail(body.get("email"));
+        String name = cleanPersonName(body.get("name"));
+        // Phone is required for doctors and staff; optional for patients
+        String phoneNumber = role.equals("PATIENT") ? body.get("phoneNumber") : cleanPhone(body.get("phoneNumber"));
 
         if (userRepository.findByUsername(username) != null) {
             throw new ApiException(409, "That username is already taken.");
@@ -82,13 +122,14 @@ public class AuthController {
 
         User user = new User(username, passwordEncoder.encode(password), role);
         user.setEmail(email);
+        // Stays false until the person enters the code we send them
+        user.setEmailVerified(false);
 
         if (role.equals("PATIENT")) {
-            String name = body.get("name");
             String ageStr = body.get("age");
             String gender = body.get("gender");
 
-            if (name == null || ageStr == null || gender == null) {
+            if (ageStr == null || gender == null) {
                 throw new ApiException(400, "Name, age, and gender are required for patient signup");
             }
 
@@ -114,7 +155,7 @@ public class AuthController {
             patient.setMedicalHistory(body.get("medicalHistory"));
             patient.setAllergies(body.get("allergies"));
             patient.setDisabilities(body.get("disabilities"));
-            patient.setPhoneNumber(body.get("phoneNumber"));
+            patient.setPhoneNumber(phoneNumber);
             patient.setAddress(body.get("address"));
             patient.setEmergencyContactName(body.get("emergencyContactName"));
             patient.setEmergencyContactPhone(body.get("emergencyContactPhone"));
@@ -124,15 +165,13 @@ public class AuthController {
         }
 
         if (role.equals("DOCTOR")) {
-            String name = body.get("name");
             String specialization = body.get("specialization");
-            String phoneNumber = body.get("phoneNumber");
 
-            if (name == null || specialization == null || phoneNumber == null) {
+            if (specialization == null || specialization.isBlank()) {
                 throw new ApiException(400, "Name, specialization, and phone number are required for doctor signup");
             }
 
-            Doctor doctor = new Doctor(name, specialization, phoneNumber);
+            Doctor doctor = new Doctor(name, specialization.trim(), phoneNumber);
             Doctor savedDoctor = doctorRepository.save(doctor);
             user.setDoctorId(savedDoctor.getId());
         }
@@ -141,18 +180,14 @@ public class AuthController {
         boolean needsApproval = role.equals("RECEPTIONIST") || role.equals("LAB_STAFF");
 
         if (needsApproval) {
-            String name = body.get("name");
-            String phoneNumber = body.get("phoneNumber");
-            if (name == null || name.isBlank() || phoneNumber == null || phoneNumber.isBlank()) {
-                throw new ApiException(400, "Name and phone number are required for staff signup");
-            }
             user.setApproved(false);
             user.setRequestedRole(role);
             user.setFullName(name);
             user.setPhoneNumber(phoneNumber);
         }
 
-        userRepository.save(user);
+        User savedUser = userRepository.save(user);
+        emailVerification.sendCode(savedUser);
 
         request.setAttribute("auditActor", username);
         request.setAttribute("auditRole", role);
@@ -160,8 +195,11 @@ public class AuthController {
                 ? (role.equals("LAB_STAFF") ? "Laboratory staff" : "Receptionist") + " application submitted"
                 : "Account created (" + role.toLowerCase() + ")");
 
+        String sent = "A 6-digit verification code was sent to " + email + " and works for "
+                + emailVerification.lifetimeText() + "." + emailVerification.deliveryNote();
+
         return needsApproval
-                ? "Application submitted. An administrator must approve it before you can log in."
-                : "Account created successfully";
+                ? "Application submitted. " + sent + " After you verify, an administrator must approve it before you can log in."
+                : "Account created. " + sent + " Enter the code to verify your email, then log in.";
     }
 }

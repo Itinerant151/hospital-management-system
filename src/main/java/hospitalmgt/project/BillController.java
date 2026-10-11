@@ -18,7 +18,7 @@ import java.util.UUID;
 @RequestMapping("/api/bills")
 public class BillController {
 
-    private static final List<String> METHODS = List.of("Cash", "Card", "Bank Transfer", "Demo");
+    private static final List<String> METHODS = List.of("Cash", "Card", "Bank Transfer", "Online payment");
     private static final List<String> CLAIM_STATUSES = List.of("PENDING", "APPROVED", "PARTIALLY_APPROVED", "REJECTED");
 
     @Autowired
@@ -110,7 +110,7 @@ public class BillController {
         return saved;
     }
 
-    // Records a payment by the patient. No amount means "pay the whole balance". Demo only: no real gateway.
+    // Records a payment by the patient. No amount means "pay the whole balance". No real payment gateway is connected.
     @PostMapping("/{id}/pay")
     public Bill pay(@PathVariable String id,
                     @RequestBody(required = false) Map<String, Object> body,
@@ -127,7 +127,7 @@ public class BillController {
         }
 
         double amount = balance;
-        String method = "Demo";
+        String method = "Online payment";
         if (body != null) {
             Object rawAmount = body.get("amount");
             if (rawAmount != null && !rawAmount.toString().isBlank()) amount = toDouble(rawAmount);

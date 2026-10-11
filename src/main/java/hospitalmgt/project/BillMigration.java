@@ -8,7 +8,8 @@ import java.util.ArrayList;
 
 /**
  * Runs at startup. Gives older bills the newer fields: payment records (so a receipt can be shown),
- * the HMO coverage percentage, and the new "HMO has paid" rule.
+ * the HMO coverage percentage, and the new "HMO has paid" rule. It also tidies the placeholder
+ * payment method and receipt prefix that older payments were saved with.
  */
 @Component
 public class BillMigration implements CommandLineRunner {
@@ -37,13 +38,29 @@ public class BillMigration implements CommandLineRunner {
                 Bill.Payment payment = new Bill.Payment();
                 payment.setReceiptNumber(bill.getTransactionId() != null ? bill.getTransactionId() : "OLD-" + suffix.toUpperCase());
                 payment.setAmount(bill.getTotal());
-                payment.setMethod("Demo");
+                payment.setMethod("Online payment");
                 payment.setPaidAt(bill.getPaidAt() != null ? bill.getPaidAt() : (bill.getCreatedAt() != null ? bill.getCreatedAt() : LocalDateTime.now()));
                 payment.setReceivedBy("system");
                 payment.setBalanceAfter(0);
                 bill.getPayments().add(payment);
                 bill.setAmountPaid(bill.getTotal());
                 changed = true;
+            }
+
+            // Older payments were saved with the placeholder method "Demo" and DEMO- receipt numbers
+            if (bill.getTransactionId() != null && bill.getTransactionId().startsWith("DEMO-")) {
+                bill.setTransactionId("RCP-" + bill.getTransactionId().substring(5));
+                changed = true;
+            }
+            for (Bill.Payment p : bill.getPayments()) {
+                if ("Demo".equalsIgnoreCase(p.getMethod())) {
+                    p.setMethod("Online payment");
+                    changed = true;
+                }
+                if (p.getReceiptNumber() != null && p.getReceiptNumber().startsWith("DEMO-")) {
+                    p.setReceiptNumber("RCP-" + p.getReceiptNumber().substring(5));
+                    changed = true;
+                }
             }
 
             // Bills made when HMO cover was a fixed amount: work out the percentage, then re-check the status

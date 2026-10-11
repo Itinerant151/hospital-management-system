@@ -11,7 +11,18 @@ function RoleDashboard() {
   const load = async () => {
     try {
       const response = await api.get('/api/dashboard/me');
-      setData(response.data);
+      let cards = response.data.cards || [];
+
+      // Extra cards (beds, lab, visiting doctors). They are optional: if they fail, the rest still shows
+      try {
+        const extra = await api.get('/api/dashboard/extras');
+        const have = new Set(cards.map((c) => c.label));
+        cards = [...cards, ...extra.data.filter((c) => !have.has(c.label))];
+      } catch (e) {
+        // ignore
+      }
+
+      setData({ ...response.data, cards });
       setError('');
     } catch (err) {
       setError(err.response?.data?.message || 'Could not load the dashboard. Check that the backend is running.');

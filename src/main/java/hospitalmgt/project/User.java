@@ -22,6 +22,8 @@ public class User {
     private String phoneNumber;
     // true while the account still uses a password that staff set for the person
     private boolean temporaryPassword = false;
+    // Existing accounts count as verified; new signups are set to false until they click the link
+    private boolean emailVerified = true;
 
     public User() {}
 
@@ -55,4 +57,6 @@ public class User {
     public void setRequestedRole(String requestedRole) { this.requestedRole = requestedRole; }
     public boolean isTemporaryPassword() { return temporaryPassword; }
     public void setTemporaryPassword(boolean temporaryPassword) { this.temporaryPassword = temporaryPassword; }
+    public boolean isEmailVerified() { return emailVerified; }
+    public void setEmailVerified(boolean emailVerified) { this.emailVerified = emailVerified; }
 }

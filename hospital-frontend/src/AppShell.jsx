@@ -1,51 +1,38 @@
-import Logo from './Logo';
-import ThemeToggle from './ThemeToggle';
-import { useConfirm } from './ConfirmDialog';
+import { useState } from 'react';
+import AppShellBase from './AppShellBase';
 
-function AppShell({ roleLabel, nav, active, onNavigate, onLogout, children }) {
-  const confirm = useConfirm();
+// Wraps the original shell and adds a Back button that returns to the
+// section you were on before. Works for every role's page.
+function AppShell({ active, onNavigate, children, ...rest }) {
+  const [history, setHistory] = useState([]);
 
-  const requestLogout = async () => {
-    const ok = await confirm('Are you sure you want to log out?', {
-      title: 'Log out',
-      confirmLabel: 'Yes, log out',
-      cancelLabel: 'Stay logged in',
-      danger: false,
-    });
-    if (ok) onLogout();
+  const handleNavigate = (key) => {
+    if (key !== active) {
+      setHistory((h) => [...h.slice(-19), active]);
+    }
+    onNavigate(key);
   };
 
+  const handleBack = () => {
+    if (history.length === 0) return;
+    const previous = history[history.length - 1];
+    setHistory((h) => h.slice(0, -1));
+    onNavigate(previous);
+  };
+
+  const nav = rest.nav || [];
+  const previousKey = history[history.length - 1];
+  const previousLabel = nav.find((item) => item.key === previousKey)?.label;
+
   return (
-    <div className="shell">
-      <aside className="sidebar">
-        <Logo />
-        <nav className="nav" aria-label="Main">
-          {nav.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              className={`nav-item${active === item.key ? ' is-active' : ''}`}
-              aria-current={active === item.key ? 'page' : undefined}
-              onClick={() => onNavigate(item.key)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </nav>
-        <div className="sidebar-foot">
-          <ThemeToggle />
-          <div className="role-line">
-            Signed in as <strong>{roleLabel}</strong>
-          </div>
-          <button type="button" className="btn btn-signout btn-sm" onClick={requestLogout}>
-            Log out
-          </button>
-        </div>
-      </aside>
-      <main className="main">
-        <div className="main-inner">{children}</div>
-      </main>
-    </div>
+    <AppShellBase {...rest} active={active} onNavigate={handleNavigate}>
+      {history.length > 0 && (
+        <button type="button" className="btn btn-quiet" style={{ marginBottom: 12 }} onClick={handleBack}>
+          &larr; Back{previousLabel ? ` to ${previousLabel}` : ''}
+        </button>
+      )}
+      {children}
+    </AppShellBase>
   );
 }
 

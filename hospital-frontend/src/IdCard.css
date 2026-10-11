@@ -1,0 +1,78 @@
+.idc-fab {
+  position: fixed; right: 20px; bottom: 20px; z-index: 900;
+  padding: 10px 16px; border: none; border-radius: 999px;
+  background: #0b5ed7; color: #fff; font-weight: 600; cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+.idc-overlay {
+  position: fixed; inset: 0; z-index: 1000; background: rgba(0, 0, 0, 0.55);
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.idc-modal {
+  background: #fff; color: #1a1a1a; border-radius: 12px; padding: 20px;
+  width: 100%; max-width: 460px; max-height: 92vh; overflow-y: auto;
+}
+.idc-modal-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.idc-modal-top h3 { margin: 0; color: #1a1a1a; }
+.idc-close { border: none; background: transparent; color: #1a1a1a; font-size: 22px; cursor: pointer; }
+.idc-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+.idc-tab {
+  flex: 1; padding: 8px; border: 1px solid #c8ccd0; background: #f3f4f6;
+  color: #1a1a1a; border-radius: 6px; cursor: pointer;
+}
+.idc-tab.active { background: #0b5ed7; color: #fff; border-color: #0b5ed7; }
+.idc-select {
+  width: 100%; padding: 8px; margin-bottom: 12px; color: #1a1a1a;
+  background: #fff; border: 1px solid #c8ccd0; border-radius: 6px;
+}
+.idc-error { color: #b00020; margin: 8px 0; }
+.idc-hint { color: #555; font-size: 14px; margin: 8px 0; }
+.idc-print-btn {
+  width: 100%; margin-top: 14px; padding: 10px; border: none; border-radius: 6px;
+  background: #0b5ed7; color: #fff; font-weight: 600; cursor: pointer;
+}
+.idc-print-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* The card itself */
+.idc-card {
+  width: 100%; max-width: 400px; margin: 0 auto; border-radius: 12px; overflow: hidden;
+  border: 1px solid #c8ccd0; background: #fff; color: #1a1a1a;
+}
+.idc-patient { --idc-accent: #0b5ed7; }
+.idc-staff { --idc-accent: #198754; }
+.idc-header {
+  display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+  background: var(--idc-accent); color: #fff;
+}
+.idc-logo {
+  width: 34px; height: 34px; border-radius: 50%; background: #fff; color: var(--idc-accent);
+  display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 700;
+}
+.idc-hospital { font-size: 18px; font-weight: 700; line-height: 1.1; }
+.idc-subtitle { font-size: 11px; letter-spacing: 1px; opacity: 0.9; }
+.idc-alert { background: #dc3545; color: #fff; font-size: 12px; font-weight: 700; text-align: center; padding: 4px; }
+.idc-body { display: flex; gap: 14px; padding: 16px; }
+.idc-photo {
+  width: 76px; height: 92px; flex: none; border-radius: 8px; background: #e9ecef;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; font-weight: 700; color: var(--idc-accent);
+}
+.idc-info { flex: 1; min-width: 0; }
+.idc-name { font-size: 18px; font-weight: 700; margin-bottom: 6px; word-break: break-word; }
+.idc-row { font-size: 13px; margin: 2px 0; display: flex; gap: 6px; }
+.idc-label { color: #555; min-width: 92px; flex: none; }
+.idc-value { font-weight: 600; word-break: break-word; }
+.idc-footer {
+  display: flex; justify-content: space-between; padding: 8px 16px;
+  background: #f3f4f6; font-size: 12px; border-top: 1px solid #dee2e6;
+}
+.idc-number { font-family: monospace; font-weight: 700; letter-spacing: 1px; }
+
+@media print {
+  body * { visibility: hidden; }
+  .idc-print-area, .idc-print-area * { visibility: visible; }
+  .idc-print-area { position: fixed; left: 0; top: 0; width: 100%; }
+  .idc-card, .idc-header, .idc-photo, .idc-footer, .idc-alert {
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+}

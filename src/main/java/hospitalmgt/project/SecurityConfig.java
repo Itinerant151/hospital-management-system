@@ -63,8 +63,9 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/login", "/signup", "/forgot-password", "/reset-password").permitAll()
+                        .requestMatchers("/login", "/login/google", "/signup", "/forgot-password", "/reset-password", "/verify/**", "/verify-email", "/resend-verification").permitAll()
                         .requestMatchers("/account/**").authenticated()
+                        .requestMatchers("/api/id-cards/**").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/admin/receptionist-requests").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/admin/receptionist-requests/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/admin/receptionist-requests/**").hasRole("ADMIN")
@@ -154,6 +155,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/prescriptions/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/statistics/me").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/dashboard/me").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/dashboard/extras").authenticated()
                         .requestMatchers("/api/statistics/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/diagnoses/*").hasAnyRole("DOCTOR", "ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/diagnoses/*").hasRole("DOCTOR")
