@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import api from './api';
 import AuthLayout from './AuthLayout';
 
@@ -15,9 +15,14 @@ function VerifyEmail({ initialEmail = '', onDone }) {
   const [busy, setBusy] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
-  const [info, setInfo] = useState('');
+  // Message left by the signup page
+  const [info, setInfo] = useState(() => sessionStorage.getItem('verifyNotice') || '');
   const [verified, setVerified] = useState(false);
   const [doneMessage, setDoneMessage] = useState('');
+
+  useEffect(() => {
+    sessionStorage.removeItem('verifyNotice');
+  }, []);
 
   const handleVerify = async (e) => {
     e.preventDefault();
@@ -76,9 +81,14 @@ function VerifyEmail({ initialEmail = '', onDone }) {
   return (
     <AuthLayout
       title="Verify your email"
-      subtitle="Enter the 6-digit code we sent to your email. It only works for a short time."
+      subtitle={
+        initialEmail
+          ? `We sent a 6-digit code to ${initialEmail}. Enter it below. It only works for a short time.`
+          : 'Enter the 6-digit code we sent to your email. It only works for a short time.'
+      }
     >
       <form className="auth-form" onSubmit={handleVerify}>
+        {info && <p className="alert alert-success">{info}</p>}
         <label className="field">
           <span>Email</span>
           <input
@@ -108,7 +118,6 @@ function VerifyEmail({ initialEmail = '', onDone }) {
             {error}
           </p>
         )}
-        {info && <p className="alert alert-success">{info}</p>}
 
         <button type="submit" className="btn btn-primary" disabled={busy}>
           {busy ? 'Checking...' : 'Verify email'}

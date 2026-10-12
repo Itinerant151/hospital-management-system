@@ -67,7 +67,6 @@ function Signup({ onSignupSuccess }) {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const setFieldError = (field, message) =>
@@ -78,7 +77,6 @@ function Signup({ onSignupSuccess }) {
   const handleSignup = async (e) => {
     e.preventDefault();
     setError('');
-    setSuccess('');
 
     const cleanName = name.trim().replace(/\s+/g, ' ');
     const cleanUsername = username.trim();
@@ -115,23 +113,15 @@ function Signup({ onSignupSuccess }) {
       }
 
       const response = await api.post('/signup', body);
-      setSuccess(
-        role === 'RECEPTIONIST' || role === 'LAB_STAFF'
-          ? (typeof response.data === 'string' && response.data) || 'Application submitted. An administrator must approve it before you can log in.'
-          : 'Account created. You can now log in.'
-      );
-      setUsername('');
-      setEmail('');
-      setPassword('');
-      setName('');
-      setAge('');
-      setGender('');
-      setSpecialization('');
-      setPhoneNumber('');
-      setFieldErrors({});
+
+      // Every new account must enter the code we sent, so open that page now
+      const message =
+        (typeof response.data === 'string' && response.data) ||
+        'Account created. Check your email for the verification code.';
+      sessionStorage.setItem('verifyNotice', message);
+      window.location.href = `/?verifyEmail=${encodeURIComponent(cleanEmail)}`;
     } catch (err) {
       setError(describeError(err));
-    } finally {
       setSubmitting(false);
     }
   };
@@ -168,7 +158,7 @@ function Signup({ onSignupSuccess }) {
             onBlur={() => email && setFieldError('email', validateEmail(email))}
             required
           />
-          <small className="field-hint">Used to reset your password if you forget it.</small>
+          <small className="field-hint">We send a 6-digit code here to confirm it is yours.</small>
           {fieldErrors.email && <small style={errorStyle}>{fieldErrors.email}</small>}
         </label>
         <PasswordField
@@ -248,7 +238,6 @@ function Signup({ onSignupSuccess }) {
             {error}
           </p>
         )}
-        {success && <p className="alert alert-success">{success}</p>}
 
         <button type="submit" className="btn btn-primary" disabled={submitting}>
           {submitting ? 'Creating account...' : 'Create account'}
