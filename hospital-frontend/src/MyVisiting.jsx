@@ -12,7 +12,7 @@ function MyVisiting() {
     api
       .get('/api/visiting-doctors/mine')
       .then((response) => setProfile(response.data))
-      .catch(() => setError('Could not load your visiting details. Check that the backend is running.'));
+      .catch(() => setError('Could not load your visiting details	. Please try again in a moment.'));
   }, []);
 
   if (error) return <p className="alert alert-error" role="alert">{error}</p>;

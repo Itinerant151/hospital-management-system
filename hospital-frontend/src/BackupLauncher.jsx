@@ -58,7 +58,7 @@ export default function BackupLauncher() {
               {busy ? 'Exporting...' : 'Download JSON export'}
             </button>
             <p className="idc-hint" style={{ marginTop: 16 }}>
-              For a full restorable backup, run <b>backup.bat</b> on the server computer.
+              For a full restorable backup, run <b>backup.bat</b> on the main hospital computer.
             </p>
           </div>
         </div>

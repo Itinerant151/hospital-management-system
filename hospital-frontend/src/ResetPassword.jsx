@@ -26,7 +26,7 @@ function ResetPassword({ token, onDone }) {
     } catch (err) {
       setError(
         err.response?.data?.message ||
-          'Could not reset your password. Check that the backend is running, or request a new link.'
+          'Could not reset your password. Please try again, or request a new link.'
       );
     }
   };

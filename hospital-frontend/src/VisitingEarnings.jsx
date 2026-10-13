@@ -32,7 +32,7 @@ function VisitingEarnings({ mine = false }) {
       setData(response.data);
       setError('');
     } catch (err) {
-      setError(err.response?.data?.message || 'Could not load earnings. Check that the backend is running.');
+      setError(err.response?.data?.message || 'Could not load earnings	. Please try again in a moment.');
     }
   };
 

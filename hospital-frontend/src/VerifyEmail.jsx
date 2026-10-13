@@ -4,7 +4,7 @@ import AuthLayout from './AuthLayout';
 
 function describe(err, fallback) {
   if (!err.response) {
-    return 'Cannot reach the server. Check that the backend is running and try again.';
+    return 'We could not connect right now. Please check your connection and try again.';
   }
   return err.response.data?.message || fallback;
 }

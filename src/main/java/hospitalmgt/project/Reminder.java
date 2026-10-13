@@ -11,7 +11,7 @@ public class Reminder {
     @Id
     private String id;
 
-    private String recipientEmail; // demo only — logged, not actually emailed
+    private String recipientEmail; // in-app only — logged, not actually emailed
     private String recipientRole;  // "PATIENT" or "DOCTOR"
     private String message;
     private String relatedAppointmentId;

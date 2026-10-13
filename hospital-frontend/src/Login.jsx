@@ -36,7 +36,7 @@ function Login({ notice, onLoginSuccess, onShowSignup, onShowForgot }) {
       } catch (err) {
         setError(
           err.response?.data?.message ||
-            (err.response ? 'Google sign-in failed. Try again.' : 'Could not reach the server. Check that the backend is running.')
+            (err.response ? 'Google sign-in failed. Try again.' : 'We could not connect right now. Please check your connection and try again.')
         );
       }
     };
@@ -90,7 +90,7 @@ function Login({ notice, onLoginSuccess, onShowSignup, onShowForgot }) {
     } catch (err) {
       setError(
         err.response?.data?.message ||
-          (err.response ? 'Invalid username or password' : 'Could not reach the server. Check that the backend is running.')
+          (err.response ? 'Invalid username or password' : 'We could not connect right now. Please check your connection and try again.')
       );
     }
   };

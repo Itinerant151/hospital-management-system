@@ -59,7 +59,7 @@ public class EmailVerificationController {
     public String deliveryNote() {
         return mailConfigured()
                 ? ""
-                : " Email sending is not set up yet, so the code was printed in the backend console.";
+                : " Email delivery is not available right now. Please contact the hospital administrator.";
     }
 
     public String resendPageUrl() {

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from './api';
 
-// Demo-only reminders: shown here instead of being emailed anywhere.
+// Reminders: shown here instead of being emailed anywhere.
 // Admins see the full system log plus a manual "generate now" trigger;
 // patients/doctors see their own inbox and can mark items as read.
 function Notifications() {

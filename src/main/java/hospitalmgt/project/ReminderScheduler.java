@@ -7,13 +7,13 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 
 /**
- * Runs every hour and generates demo reminders for any "Scheduled" appointment
- * that hasn't had a reminder sent yet. This is demo-only: reminders are just
+ * Runs every hour and generates reminders for any "Scheduled" appointment
+ * that hasn't had a reminder sent yet. Reminders are just
  * saved to the reminders collection (shown in Notifications.jsx) rather than
  * actually emailed anywhere.
  *
  * Also exposed via a manual "run now" endpoint (POST /api/reminders/generate)
- * for demoing without waiting on the schedule.
+ * for testing without waiting on the schedule.
  */
 @Service
 public class ReminderScheduler {

@@ -32,7 +32,7 @@ function DoctorPrescriptions({ presetPatientId }) {
       setAssignedIds(mine.data.map((p) => p.id));
       setMedicines(meds.data);
     };
-    load().catch(() => setError('Could not load your patients. Check that the backend is running.'));
+    load().catch(() => setError('Could not load your patients	. Please try again in a moment.'));
     loadList();
   }, []);
 

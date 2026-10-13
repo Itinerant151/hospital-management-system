@@ -15,7 +15,7 @@ function VisitationAdmin() {
   };
 
   useEffect(() => {
-    fetchVisits().catch(() => setError('Could not load the visits. Check that the backend is running.'));
+    fetchVisits().catch(() => setError('Could not load the visits	. Please try again in a moment.'));
   }, []);
 
   const updateStatus = async (id, status) => {

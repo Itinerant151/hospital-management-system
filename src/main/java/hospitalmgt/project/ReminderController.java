@@ -16,7 +16,7 @@ public class ReminderController {
     @Autowired
     private ReminderScheduler reminderScheduler;
 
-    // Manually trigger reminder generation now (handy for demoing without waiting on the schedule)
+    // Manually trigger reminder generation now (handy for testing without waiting on the schedule)
     @PostMapping("/generate")
     public ResponseEntity<String> generateNow() {
         int created = reminderScheduler.runNow();
@@ -34,7 +34,7 @@ public class ReminderController {
         return reminderRepository.findByRecipientEmailOrderBySentAtDesc(email);
     }
 
-    // Manually create a demo reminder (handy for demoing without waiting on the schedule)
+    // Manually create a reminder (handy for testing without waiting on the schedule)
     @PostMapping
     public Reminder create(@RequestBody Reminder reminder) {
         return reminderRepository.save(reminder);

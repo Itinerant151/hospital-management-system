@@ -5,7 +5,7 @@ import { formatNaira } from './currency';
 import { formatDateTime } from './format';
 import { claimLabel, statusLabel } from './billingHelpers';
 
-// On-screen receipt for one payment. "Print Receipt" opens the browser's print window (demo feature).
+// On-screen receipt for one payment. "Print Receipt" opens the browser's print window .
 function Receipt({ billId, paymentNumber, onClose }) {
   const [receipt, setReceipt] = useState(null);
   const [error, setError] = useState('');

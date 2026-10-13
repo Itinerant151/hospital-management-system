@@ -53,7 +53,7 @@ function FrontDesk() {
       setBills(billRes.data);
       setLog(logRes.data);
     } catch (err) {
-      setError('Could not load the front desk. Check that the backend is running and try again.');
+      setError('Could not load the front desk. Please try again.');
     }
   };
 

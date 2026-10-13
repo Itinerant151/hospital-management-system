@@ -18,7 +18,7 @@ export default function VerifyStaff({ initialCode = '', onBack }) {
     axios
       .get(`${API}/${encodeURIComponent(code.trim())}`)
       .then((res) => setResult(res.data))
-      .catch(() => setError('Could not reach the server. Try again.'));
+      .catch(() => setError('We could not connect right now. Please try again.'));
   };
 
   const box = {

@@ -12,7 +12,7 @@ function MyAdmission() {
     api
       .get('/api/admissions/mine')
       .then((response) => setAdmissions(response.data))
-      .catch((err) => setError(err.response?.data?.message || 'Could not load your admissions. Check that the backend is running.'));
+      .catch((err) => setError(err.response?.data?.message || 'Could not load your admissions	. Please try again in a moment.'));
   }, []);
 
   if (error) return <p className="alert alert-error" role="alert">{error}</p>;

@@ -40,7 +40,7 @@ function HmoClaims() {
   };
 
   useEffect(() => {
-    load().catch(() => setError('Could not load the claims. Check that the backend is running.'));
+    load().catch(() => setError('Could not load the claims	. Please try again in a moment.'));
   }, []);
 
   const patientName = (id) => patients.find((p) => p.id === id)?.name || 'Unknown';

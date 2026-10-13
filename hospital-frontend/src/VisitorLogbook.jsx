@@ -32,7 +32,7 @@ function VisitorLogbook() {
   };
 
   useEffect(() => {
-    load().catch(() => setError('Could not load the logbook. Check that the backend is running.'));
+    load().catch(() => setError('Could not load the logbook	. Please try again in a moment.'));
   }, []);
 
   const update = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));

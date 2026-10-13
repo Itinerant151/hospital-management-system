@@ -25,7 +25,7 @@ function RoleDashboard() {
       setData({ ...response.data, cards });
       setError('');
     } catch (err) {
-      setError(err.response?.data?.message || 'Could not load the dashboard. Check that the backend is running.');
+      setError(err.response?.data?.message || 'We could not load your dashboard right now. Please try again in a moment.');
     }
   };
 

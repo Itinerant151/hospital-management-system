@@ -35,7 +35,7 @@ function validatePhone(value) {
 
 function describeError(err) {
   if (!err.response) {
-    return 'Cannot reach the server. Check that the backend is running and try again.';
+    return 'We could not connect right now. Please check your connection and try again.';
   }
   const data = err.response.data;
   const serverMessage =
@@ -47,7 +47,7 @@ function describeError(err) {
     case 409:
       return 'That username or email is already registered.';
     case 500:
-      return 'The server had a problem. Try again in a moment.';
+      return 'Something went wrong on our side. Please try again in a moment.';
     default:
       return `Signup failed (error ${err.response.status}).`;
   }

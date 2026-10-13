@@ -40,7 +40,7 @@ function Wards() {
       setPatients(patientRes.data);
       setDoctors(doctorRes.data);
     } catch (err) {
-      setError('Could not load the wards. Check that the backend is running and try again.');
+      setError('Could not load the wards. Please try again.');
     }
   };
 

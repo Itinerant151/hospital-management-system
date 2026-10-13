@@ -5,7 +5,7 @@ import { formatNaira } from './currency';
 import { formatDateTime } from './format';
 import { claimLabel, percentText, statusLabel } from './billingHelpers';
 
-// On-screen receipt for the payment the HMO made. "Print Receipt" opens the browser's print window (demo).
+// On-screen receipt for the payment the HMO made. "Print Receipt" opens the browser's print window .
 function HmoReceipt({ billId, onClose }) {
   const [receipt, setReceipt] = useState(null);
   const [error, setError] = useState('');

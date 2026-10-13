@@ -37,7 +37,7 @@ function VisitingDoctors() {
   };
 
   useEffect(() => {
-    load().catch(() => setError('Could not load visiting doctors. Check that the backend is running.'));
+    load().catch(() => setError('Could not load visiting doctors	. Please try again in a moment.'));
   }, []);
 
   const set = (key) => (e) => setForm({ ...form, [key]: e.target.value });

@@ -49,7 +49,7 @@ public class GoogleAuthController {
     @PostMapping("/login/google")
     public Map<String, String> loginWithGoogle(@RequestBody Map<String, String> body, HttpServletRequest request) {
         if (clientId == null || clientId.isBlank()) {
-            throw new ApiException(503, "Google sign-in is not set up on this server yet.");
+            throw new ApiException(503, "Google sign-in is not available right now.");
         }
         String credential = body.get("credential");
         if (credential == null || credential.isBlank()) {

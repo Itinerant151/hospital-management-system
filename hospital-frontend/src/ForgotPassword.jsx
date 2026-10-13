@@ -21,7 +21,7 @@ function ForgotPassword({ onBack }) {
       setSent(true);
     } catch (err) {
       setError(
-        err.response?.data?.message || 'Could not send the reset link. Check that the backend is running.'
+        err.response?.data?.message || 'Could not send the reset link. Please try again in a moment.'
       );
     }
   };
