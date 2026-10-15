@@ -2,7 +2,7 @@ import { useState } from 'react';
 import axios from 'axios';
 import './IdCard.css';
 
-const API = 'http://localhost:8080/api/backup';
+const API = `${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/backup`;
 
 export default function BackupLauncher() {
   const [open, setOpen] = useState(false);

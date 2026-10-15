@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import axios from 'axios';
 
-const API = 'http://localhost:8080/verify/staff';
+const API = `${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/verify/staff`;
 
 export default function VerifyStaff({ initialCode = '', onBack }) {
   const [code, setCode] = useState(initialCode);

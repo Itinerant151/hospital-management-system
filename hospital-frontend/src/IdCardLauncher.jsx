@@ -4,7 +4,7 @@ import IdCard from './IdCard';
 import './IdCard.css';
 
 // Change this if your backend runs on a different address
-const API = 'http://localhost:8080/api/id-cards';
+const API = `${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/id-cards`;
 
 function authHeader() {
   return { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
