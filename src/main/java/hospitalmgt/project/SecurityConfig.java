@@ -63,7 +63,7 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/login", "/login/google", "/signup", "/forgot-password", "/reset-password", "/verify/**", "/verify-email", "/resend-verification").permitAll()
+                        .requestMatchers("/login", "/login/google", "/signup", "/forgot-password", "/reset-password", "/verify/**", "/verify-email", "/resend-verification", "/health").permitAll()
                         .requestMatchers("/account/**").authenticated()
                         .requestMatchers("/api/id-cards/**").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/admin/receptionist-requests").hasRole("ADMIN")

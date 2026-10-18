@@ -1,12 +1,9 @@
 package hospitalmgt.project;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -21,8 +18,8 @@ import java.util.Map;
 @RestController
 public class EmailVerificationController {
 
-    // How long a code works, in minutes (raise this to 5 if emails reach you slowly)
-    public static final long CODE_MINUTES = 1;
+    // How long a code works, in minutes
+    public static final long CODE_MINUTES = 5;
     // Wrong guesses allowed before the code is thrown away
     private static final int MAX_ATTEMPTS = 5;
     // Minimum wait before another code can be requested for the same account
@@ -32,32 +29,23 @@ public class EmailVerificationController {
     @Value("${app.frontend-url:http://localhost:5173}")
     private String frontendUrl;
 
-    @Value("${spring.mail.username:}")
-    private String mailUsername;
-
-    // Only exists when the mail library is on the classpath and spring.mail.host is set
-    @Autowired(required = false)
-    private JavaMailSender mailSender;
-
     private final MongoTemplate mongo;
     private final UserRepository userRepository;
+    private final MailService mailService;
 
-    public EmailVerificationController(MongoTemplate mongo, UserRepository userRepository) {
+    public EmailVerificationController(MongoTemplate mongo, UserRepository userRepository, MailService mailService) {
         this.mongo = mongo;
         this.userRepository = userRepository;
-    }
-
-    private boolean mailConfigured() {
-        return mailSender != null && mailUsername != null && !mailUsername.isBlank();
+        this.mailService = mailService;
     }
 
     public String lifetimeText() {
         return CODE_MINUTES == 1 ? "1 minute" : CODE_MINUTES + " minutes";
     }
 
-    // Shown to the person only while real email sending is not set up
+    // Shown to the person only while email sending is not set up
     public String deliveryNote() {
-        return mailConfigured()
+        return mailService.isConfigured()
                 ? ""
                 : " Email delivery is not available right now. Please contact the hospital administrator.";
     }
@@ -81,25 +69,15 @@ public class EmailVerificationController {
         t.setExpiresAt(now.plus(CODE_MINUTES, ChronoUnit.MINUTES));
         mongo.save(t);
 
-        if (mailConfigured()) {
-            try {
-                SimpleMailMessage message = new SimpleMailMessage();
-                message.setFrom(mailUsername);
-                message.setTo(user.getEmail());
-                message.setSubject("Your MediCore verification code");
-                message.setText("Your MediCore verification code is " + code + ".\n\n"
-                        + "It works for " + lifetimeText() + ". "
-                        + "If you did not create a MediCore account, you can ignore this email.");
-                mailSender.send(message);
-                System.out.println("Verification code emailed to " + user.getEmail());
-                return;
-            } catch (Exception e) {
-                System.out.println("Could not send the email (" + e.getMessage()
-                        + "). Showing the code here instead.");
-            }
+        String text = "Your MediCore verification code is " + code + ".\n\n"
+                + "It works for " + lifetimeText() + ". "
+                + "If you did not create a MediCore account, you can ignore this email.";
+        if (mailService.send(user.getEmail(), "Your MediCore verification code", text)) {
+            System.out.println("Verification code emailed to " + user.getEmail());
+            return;
         }
 
-        // No mail server, or sending failed: print the code where you can read it
+        // Email is not set up or failed: print the code where the owner can read it
         System.out.println();
         System.out.println("=== EMAIL VERIFICATION CODE for " + user.getEmail()
                 + ": " + code + " (valid for " + lifetimeText() + ") ===");
