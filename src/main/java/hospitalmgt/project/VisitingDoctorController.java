@@ -106,6 +106,12 @@ public class VisitingDoctorController {
             throw new ApiException(409, "An account with that email already exists.");
         }
 
+        String licenceBody = text(body, "licenceBody");
+        String licenceNumber = LicenceRules.cleanNumber(text(body, "licenceNumber"));
+        String licenceExpiry = text(body, "licenceExpiry");
+        LicenceRules.validate(licenceBody, licenceNumber, licenceExpiry);
+        boolean licenceChecked = Boolean.parseBoolean(text(body, "licenceChecked"));
+
         Doctor doctor = doctorRepository.save(new Doctor(name, specialization, phoneNumber));
 
         User user = new User(username, passwordEncoder.encode(password), "DOCTOR");
@@ -114,6 +120,17 @@ public class VisitingDoctorController {
         user.setFullName(name);
         user.setPhoneNumber(phoneNumber);
         user.setTemporaryPassword(true);
+        user.setLicenceBody(licenceBody);
+        user.setLicenceNumber(licenceNumber);
+        user.setLicenceExpiry(licenceExpiry);
+        if (licenceChecked) {
+            // The admin ticked "I checked this on the official register"
+            user.setLicenceStatus("VERIFIED");
+            user.setLicenceCheckedBy((String) request.getAttribute("username"));
+            user.setLicenceCheckedAt(java.time.LocalDateTime.now().toString());
+        } else {
+            user.setLicenceStatus("PENDING");
+        }
         userRepository.save(user);
 
         VisitingDoctor visiting = new VisitingDoctor();

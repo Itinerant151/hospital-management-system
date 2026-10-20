@@ -133,6 +133,10 @@ public class EmailVerificationController {
             return Map.of("message",
                     "Email verified. An administrator still has to approve your application before you can log in.");
         }
+        String licenceProblem = LicenceRules.blockReason(user);
+        if (licenceProblem != null) {
+            return Map.of("message", "Email verified. " + licenceProblem);
+        }
         return Map.of("message", "Email verified. You can now log in.");
     }
 

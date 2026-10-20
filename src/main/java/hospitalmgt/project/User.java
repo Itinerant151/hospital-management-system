@@ -22,8 +22,18 @@ public class User {
     private String phoneNumber;
     // true while the account still uses a password that staff set for the person
     private boolean temporaryPassword = false;
-    // Existing accounts count as verified; new signups are set to false until they click the link
+    // Existing accounts count as verified; new signups are set to false until they enter the emailed code
     private boolean emailVerified = true;
+
+    // Professional licence details (doctors and laboratory staff).
+    // All null for everyone else, and for accounts created before licence checks existed.
+    private String licenceBody;       // MDCN, MLSCN, NMCN, PCN or OTHER
+    private String licenceNumber;
+    private String licenceExpiry;     // yyyy-MM-dd
+    private String licenceStatus;     // PENDING, VERIFIED or REJECTED
+    private String licenceCheckedBy;  // the admin who checked it on the official register
+    private String licenceCheckedAt;  // date and time of that check
+    private String licenceNote;
 
     public User() {}
 
@@ -59,4 +69,19 @@ public class User {
     public void setTemporaryPassword(boolean temporaryPassword) { this.temporaryPassword = temporaryPassword; }
     public boolean isEmailVerified() { return emailVerified; }
     public void setEmailVerified(boolean emailVerified) { this.emailVerified = emailVerified; }
+
+    public String getLicenceBody() { return licenceBody; }
+    public void setLicenceBody(String licenceBody) { this.licenceBody = licenceBody; }
+    public String getLicenceNumber() { return licenceNumber; }
+    public void setLicenceNumber(String licenceNumber) { this.licenceNumber = licenceNumber; }
+    public String getLicenceExpiry() { return licenceExpiry; }
+    public void setLicenceExpiry(String licenceExpiry) { this.licenceExpiry = licenceExpiry; }
+    public String getLicenceStatus() { return licenceStatus; }
+    public void setLicenceStatus(String licenceStatus) { this.licenceStatus = licenceStatus; }
+    public String getLicenceCheckedBy() { return licenceCheckedBy; }
+    public void setLicenceCheckedBy(String licenceCheckedBy) { this.licenceCheckedBy = licenceCheckedBy; }
+    public String getLicenceCheckedAt() { return licenceCheckedAt; }
+    public void setLicenceCheckedAt(String licenceCheckedAt) { this.licenceCheckedAt = licenceCheckedAt; }
+    public String getLicenceNote() { return licenceNote; }
+    public void setLicenceNote(String licenceNote) { this.licenceNote = licenceNote; }
 }

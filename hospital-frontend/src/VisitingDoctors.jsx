@@ -17,6 +17,10 @@ const EMPTY_FORM = {
   password: '',
   consultationFee: '',
   hospitalSharePercent: '',
+  licenceBody: 'MDCN',
+  licenceNumber: '',
+  licenceExpiry: '',
+  licenceChecked: false,
 };
 
 function VisitingDoctors() {
@@ -37,7 +41,7 @@ function VisitingDoctors() {
   };
 
   useEffect(() => {
-    load().catch(() => setError('Could not load visiting doctors	. Please try again in a moment.'));
+    load().catch(() => setError('Could not load visiting doctors. Please try again in a moment.'));
   }, []);
 
   const set = (key) => (e) => setForm({ ...form, [key]: e.target.value });
@@ -150,6 +154,36 @@ function VisitingDoctors() {
                 <input type="number" min="0" max="100" step="0.01" value={form.hospitalSharePercent} onChange={set('hospitalSharePercent')} required />
               </label>
             </div>
+
+            <h3 style={{ margin: '22px 0 10px' }}>Professional licence</h3>
+            <div className="form-grid">
+              <label className="field">
+                <span>Licensing body</span>
+                <select value={form.licenceBody} onChange={set('licenceBody')} required>
+                  <option value="MDCN">MDCN (doctors and dentists)</option>
+                  <option value="NMCN">NMCN (nurses and midwives)</option>
+                  <option value="PCN">PCN (pharmacists)</option>
+                  <option value="MLSCN">MLSCN (laboratory scientists)</option>
+                  <option value="OTHER">Other licensing body</option>
+                </select>
+              </label>
+              <label className="field">
+                <span>Licence number</span>
+                <input type="text" value={form.licenceNumber} onChange={set('licenceNumber')} required />
+              </label>
+              <label className="field">
+                <span>Licence expiry date</span>
+                <input type="date" value={form.licenceExpiry} onChange={set('licenceExpiry')} required />
+              </label>
+            </div>
+            <label style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '14px' }}>
+              <input
+                type="checkbox"
+                checked={form.licenceChecked}
+                onChange={(e) => setForm({ ...form, licenceChecked: e.target.checked })}
+              />
+              <span>I checked this licence on the council's official register</span>
+            </label>
 
             <h3 style={{ margin: '22px 0 10px' }}>Weekly visiting schedule</h3>
             <ScheduleEditor value={schedule} onChange={setSchedule} />

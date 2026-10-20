@@ -96,6 +96,11 @@ public class GoogleAuthController {
                     "Your " + applied + " application is awaiting admin approval.");
         }
 
+        String licenceProblem = LicenceRules.blockReason(user);
+        if (licenceProblem != null) {
+            throw fail(request, user.getUsername(), "Login blocked: licence not valid", 403, licenceProblem);
+        }
+
         String token = jwtUtil.generateToken(user.getUsername(), user.getRole(), user.getPatientId(), user.getDoctorId());
 
         request.setAttribute("auditActor", user.getUsername());

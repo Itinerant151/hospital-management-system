@@ -4,10 +4,22 @@ import AuthLayout from './AuthLayout';
 import PasswordField from './PasswordField';
 
 // Letters (any language) with single spaces, hyphens or apostrophes between names.
-// Allows "Abdur-Rasheed" and "O'Neil", rejects digits and symbols.
 const NAME_PATTERN = /^\p{L}+(?:[ '-]\p{L}+)*$/u;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const PHONE_PATTERN = /^\+?\d{7,15}$/;
+const LICENCE_NUMBER_PATTERN = /^[A-Za-z0-9][A-Za-z0-9/ -]{2,28}[A-Za-z0-9]$/;
+
+const LICENCE_BODIES = [
+  { value: 'MDCN', label: 'MDCN (doctors and dentists)' },
+  { value: 'MLSCN', label: 'MLSCN (laboratory scientists)' },
+  { value: 'NMCN', label: 'NMCN (nurses and midwives)' },
+  { value: 'PCN', label: 'PCN (pharmacists)' },
+  { value: 'OTHER', label: 'Other licensing body' },
+];
+
+function defaultBody(role) {
+  return role === 'LAB_STAFF' ? 'MLSCN' : 'MDCN';
+}
 
 function validateName(value) {
   const v = value.trim();
@@ -30,6 +42,25 @@ function validatePhone(value) {
   const v = value.replace(/[\s-]/g, '');
   if (!v) return 'Enter your phone number.';
   if (!PHONE_PATTERN.test(v)) return 'Enter a valid phone number (digits only, optional + at the start).';
+  return '';
+}
+
+function validateLicenceNumber(value) {
+  const v = value.trim().replace(/\s+/g, ' ');
+  if (!v) return 'Enter your licence number.';
+  if (!LICENCE_NUMBER_PATTERN.test(v)) {
+    return 'Use 4 to 30 characters: letters, digits, / and - only.';
+  }
+  return '';
+}
+
+function validateLicenceExpiry(value) {
+  if (!value) return 'Enter the expiry date shown on your licence.';
+  const today = new Date().toISOString().slice(0, 10);
+  if (value < today) return 'That licence has already expired. A current licence is required.';
+  const limit = new Date();
+  limit.setFullYear(limit.getFullYear() + 10);
+  if (value > limit.toISOString().slice(0, 10)) return 'Check the expiry date. It is more than 10 years away.';
   return '';
 }
 
@@ -65,6 +96,9 @@ function Signup({ onSignupSuccess }) {
   const [gender, setGender] = useState('');
   const [specialization, setSpecialization] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [licenceBody, setLicenceBody] = useState('MDCN');
+  const [licenceNumber, setLicenceNumber] = useState('');
+  const [licenceExpiry, setLicenceExpiry] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -73,6 +107,7 @@ function Signup({ onSignupSuccess }) {
     setFieldErrors((prev) => ({ ...prev, [field]: message }));
 
   const needsPhone = role === 'DOCTOR' || role === 'RECEPTIONIST' || role === 'LAB_STAFF';
+  const needsLicence = role === 'DOCTOR' || role === 'LAB_STAFF';
 
   const handleSignup = async (e) => {
     e.preventDefault();
@@ -82,14 +117,17 @@ function Signup({ onSignupSuccess }) {
     const cleanUsername = username.trim();
     const cleanEmail = email.trim();
     const cleanPhone = phoneNumber.replace(/[\s-]/g, '');
+    const cleanLicenceNumber = licenceNumber.trim().replace(/\s+/g, ' ');
 
     const errors = {
       name: validateName(cleanName),
       email: validateEmail(cleanEmail),
       phone: needsPhone ? validatePhone(phoneNumber) : '',
+      licenceNumber: needsLicence ? validateLicenceNumber(licenceNumber) : '',
+      licenceExpiry: needsLicence ? validateLicenceExpiry(licenceExpiry) : '',
     };
     setFieldErrors(errors);
-    if (errors.name || errors.email || errors.phone) {
+    if (errors.name || errors.email || errors.phone || errors.licenceNumber || errors.licenceExpiry) {
       setError('Please fix the highlighted fields and try again.');
       return;
     }
@@ -111,6 +149,11 @@ function Signup({ onSignupSuccess }) {
         body.specialization = specialization.trim();
         body.phoneNumber = cleanPhone;
       }
+      if (needsLicence) {
+        body.licenceBody = licenceBody; 
+        body.licenceNumber = cleanLicenceNumber;
+        body.licenceExpiry = licenceExpiry;
+      }
 
       const response = await api.post('/signup', body);
 
@@ -127,11 +170,21 @@ function Signup({ onSignupSuccess }) {
   };
 
   return (
-    <AuthLayout title="Create an account" subtitle="Choose the role that matches you. Staff roles need administrator approval.">
+    <AuthLayout
+      title="Create an account"
+      subtitle="Choose the role that matches you. Staff roles need administrator approval, and doctors and laboratory staff also need a verified licence."
+    >
       <form className="auth-form" onSubmit={handleSignup}>
         <label className="field">
           <span>I am a</span>
-          <select value={role} onChange={(e) => { setRole(e.target.value); setFieldErrors({}); }}>
+          <select
+            value={role}
+            onChange={(e) => {
+              setRole(e.target.value);
+              setLicenceBody(defaultBody(e.target.value));
+              setFieldErrors({});
+            }}
+          >
             <option value="PATIENT">Patient</option>
             <option value="DOCTOR">Doctor</option>
             <option value="RECEPTIONIST">Receptionist</option>
@@ -231,6 +284,50 @@ function Signup({ onSignupSuccess }) {
             />
             {fieldErrors.phone && <small style={errorStyle}>{fieldErrors.phone}</small>}
           </label>
+        )}
+
+        {needsLicence && (
+          <>
+            <label className="field">
+              <span>Licensing body</span>
+              <select value={licenceBody} onChange={(e) => setLicenceBody(e.target.value)} required>
+                {LICENCE_BODIES.map((b) => (
+                  <option key={b.value} value={b.value}>{b.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Licence number</span>
+              <input
+                type="text"
+                value={licenceNumber}
+                onChange={(e) => {
+                  setLicenceNumber(e.target.value);
+                  if (fieldErrors.licenceNumber) setFieldError('licenceNumber', validateLicenceNumber(e.target.value));
+                }}
+                onBlur={() => licenceNumber && setFieldError('licenceNumber', validateLicenceNumber(licenceNumber))}
+                required
+              />
+              <small className="field-hint">
+                Exactly as on your practising licence. An administrator checks it on the council's register before you can log in.
+              </small>
+              {fieldErrors.licenceNumber && <small style={errorStyle}>{fieldErrors.licenceNumber}</small>}
+            </label>
+            <label className="field">
+              <span>Licence expiry date</span>
+              <input
+                type="date"
+                value={licenceExpiry}
+                onChange={(e) => {
+                  setLicenceExpiry(e.target.value);
+                  if (fieldErrors.licenceExpiry) setFieldError('licenceExpiry', validateLicenceExpiry(e.target.value));
+                }}
+                onBlur={() => licenceExpiry && setFieldError('licenceExpiry', validateLicenceExpiry(licenceExpiry))}
+                required
+              />
+              {fieldErrors.licenceExpiry && <small style={errorStyle}>{fieldErrors.licenceExpiry}</small>}
+            </label>
+          </>
         )}
 
         {error && (

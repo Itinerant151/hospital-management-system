@@ -48,7 +48,7 @@ function ReceptionistRequests() {
 
   return (
     <div>
-      <div className="page-head"><h1>Staff applications</h1><p>Review receptionist and laboratory staff applications before granting access to MediCore.</p></div>
+      <div className="page-head"><h1>Staff applications</h1><p>Review receptionist and laboratory staff applications before granting access to MediCore. Laboratory staff also need their licence verified under Licence checks.</p></div>
       {message && <p className="alert alert-success">{message}</p>}
       {error && <p className="alert alert-error" role="alert">{error}</p>}
       <div className="table-wrap">

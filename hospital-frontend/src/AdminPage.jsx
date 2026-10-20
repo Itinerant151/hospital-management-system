@@ -19,12 +19,14 @@ import AccountSettings from './AccountSettings';
 import EmergencyPatients from './EmergencyPatients';
 import ReceptionistRequests from './ReceptionistRequests';
 import AuditLogPage from './AuditLogPage';
+import LicenceChecks from './LicenceChecks';
 
 const NAV = [
   { key: 'dashboard', label: 'Dashboard' },
   { key: 'patients', label: 'Patients' },
   { key: 'emergency', label: 'Emergency Patients' },
   { key: 'receptionists', label: 'Staff applications' },
+  { key: 'licences', label: 'Licence checks' },
   { key: 'doctors', label: 'Doctors' },
   { key: 'visiting', label: 'Visiting doctors' },
   { key: 'earnings', label: 'Visiting earnings' },
@@ -57,6 +59,7 @@ function AdminPage({ onLogout }) {
       {activeTab === 'patients' && <Patients />}
       {activeTab === 'emergency' && <EmergencyPatients />}
       {activeTab === 'receptionists' && <ReceptionistRequests />}
+      {activeTab === 'licences' && <LicenceChecks />}
       {activeTab === 'doctors' && <Doctors />}
       {activeTab === 'visiting' && <VisitingDoctors />}
       {activeTab === 'earnings' && <VisitingEarnings />}

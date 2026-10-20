@@ -84,6 +84,14 @@ public class AuthController {
             throw new ApiException(403, "Your " + applied + " application is awaiting admin approval.");
         }
 
+        String licenceProblem = LicenceRules.blockReason(user);
+        if (licenceProblem != null) {
+            request.setAttribute("auditActor", user.getUsername());
+            request.setAttribute("auditDetail", "Login blocked: licence not valid");
+            request.setAttribute("auditAlways", true);
+            throw new ApiException(403, licenceProblem);
+        }
+
         String token = jwtUtil.generateToken(user.getUsername(), user.getRole(), user.getPatientId(), user.getDoctorId());
 
         request.setAttribute("auditActor", user.getUsername());
@@ -124,6 +132,18 @@ public class AuthController {
         user.setEmail(email);
         // Stays false until the person enters the code we send them
         user.setEmailVerified(false);
+
+        // Doctors and laboratory staff must give their licence details
+        if (LicenceRules.required(role)) {
+            String licenceBody = body.get("licenceBody");
+            String licenceNumber = LicenceRules.cleanNumber(body.get("licenceNumber"));
+            String licenceExpiry = body.get("licenceExpiry");
+            LicenceRules.validate(licenceBody, licenceNumber, licenceExpiry);
+            user.setLicenceBody(licenceBody);
+            user.setLicenceNumber(licenceNumber);
+            user.setLicenceExpiry(licenceExpiry);
+            user.setLicenceStatus("PENDING");
+        }
 
         if (role.equals("PATIENT")) {
             String ageStr = body.get("age");
