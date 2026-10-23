@@ -150,7 +150,7 @@ function Signup({ onSignupSuccess }) {
         body.phoneNumber = cleanPhone;
       }
       if (needsLicence) {
-        body.licenceBody = licenceBody; 
+        body.licenceBody = licenceBody;
         body.licenceNumber = cleanLicenceNumber;
         body.licenceExpiry = licenceExpiry;
       }
