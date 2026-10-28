@@ -7,6 +7,7 @@ import { formatDateTime } from './format';
 function RoleDashboard() {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
+  const [revealed, setRevealed] = useState({});
 
   const load = async () => {
     try {
@@ -38,6 +39,16 @@ function RoleDashboard() {
 
   const show = (card) => (card.kind === 'money' ? formatNaira(card.value) : Number(card.value).toLocaleString('en-GB'));
 
+  // Short form for money cards, e.g. ₦422K. Tap a card to see the full amount.
+  const compactNaira = (value) => {
+    const n = Number(value) || 0;
+    if (Math.abs(n) < 1000) return formatNaira(n);
+    const short = new Intl.NumberFormat('en-NG', { notation: 'compact', maximumFractionDigits: 1 }).format(n);
+    return `₦${short}`;
+  };
+
+  const toggle = (label) => setRevealed((prev) => ({ ...prev, [label]: !prev[label] }));
+
   return (
     <div>
       <div className="page-head">
@@ -46,12 +57,31 @@ function RoleDashboard() {
       </div>
 
       <div className="stat-grid">
-        {data.cards.map((card) => (
-          <div className="stat-card" key={card.label}>
-            <span className="stat-value">{show(card)}</span>
-            <span className="stat-label">{card.label}</span>
-          </div>
-        ))}
+        {data.cards.map((card) => {
+          if (card.kind !== 'money') {
+            return (
+              <div className="stat-card" key={card.label}>
+                <span className="stat-value">{show(card)}</span>
+                <span className="stat-label">{card.label}</span>
+              </div>
+            );
+          }
+          const open = !!revealed[card.label];
+          return (
+            <button
+              type="button"
+              className={`stat-card stat-card-money${open ? ' is-open' : ''}`}
+              key={card.label}
+              onClick={() => toggle(card.label)}
+              aria-expanded={open}
+              title={open ? 'Tap to show the short amount' : 'Tap to show the full amount'}
+            >
+              <span className="stat-value">{open ? show(card) : compactNaira(card.value)}</span>
+              <span className="stat-label">{card.label}</span>
+              <span className="stat-hint">{open ? 'Tap to shorten' : 'Tap for full amount'}</span>
+            </button>
+          );
+        })}
       </div>
 
       <div className="list-head" style={{ marginTop: '28px' }}>
