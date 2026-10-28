@@ -813,7 +813,7 @@ input[aria-invalid='true'] {
 
 .stat-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 16px;
   margin-bottom: 24px;
 }
@@ -823,13 +823,19 @@ input[aria-invalid='true'] {
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 16px 18px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .stat-card .stat-value {
-  font-size: 1.9rem;
+  font-size: clamp(1.3rem, 1.6vw + 0.6rem, 1.9rem);
   font-weight: 700;
   color: var(--ink);
   display: block;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .stat-card .stat-label {
