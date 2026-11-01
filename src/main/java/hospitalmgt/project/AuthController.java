@@ -56,6 +56,18 @@ public class AuthController {
         return p;
     }
 
+    private String staffLabel(String role) {
+        if ("LAB_STAFF".equals(role)) return "laboratory staff";
+        if ("PHARMACIST".equals(role)) return "pharmacist";
+        return "receptionist";
+    }
+
+    private String staffTitle(String role) {
+        if ("LAB_STAFF".equals(role)) return "Laboratory staff";
+        if ("PHARMACIST".equals(role)) return "Pharmacist";
+        return "Receptionist";
+    }
+
     @PostMapping("/login")
     public Map<String, String> login(@RequestBody Map<String, String> body, HttpServletRequest request) {
         String username = body.get("username");
@@ -77,7 +89,7 @@ public class AuthController {
                     + "or get a new one at " + emailVerification.resendPageUrl());
         }
         if (!user.isApproved()) {
-            String applied = "LAB_STAFF".equals(user.getRequestedRole()) ? "laboratory staff" : "receptionist";
+            String applied = staffLabel(user.getRequestedRole());
             request.setAttribute("auditActor", user.getUsername());
             request.setAttribute("auditDetail", "Login blocked: " + applied + " application not approved yet");
             request.setAttribute("auditAlways", true);
@@ -109,7 +121,7 @@ public class AuthController {
     @PostMapping("/signup")
     public String signup(@RequestBody Map<String, String> body, HttpServletRequest request) {
         String role = body.get("role");
-        if (role == null || (!role.equals("DOCTOR") && !role.equals("PATIENT") && !role.equals("RECEPTIONIST") && !role.equals("LAB_STAFF"))) {
+        if (role == null || (!role.equals("DOCTOR") && !role.equals("PATIENT") && !role.equals("RECEPTIONIST") && !role.equals("LAB_STAFF") && !role.equals("PHARMACIST"))) {
             throw new ApiException(400, "Invalid role for signup");
         }
 
@@ -133,7 +145,7 @@ public class AuthController {
         // Stays false until the person enters the code we send them
         user.setEmailVerified(false);
 
-        // Doctors and laboratory staff must give their licence details
+        // Doctors, laboratory staff and pharmacists must give their licence details
         if (LicenceRules.required(role)) {
             String licenceBody = body.get("licenceBody");
             String licenceNumber = LicenceRules.cleanNumber(body.get("licenceNumber"));
@@ -196,8 +208,8 @@ public class AuthController {
             user.setDoctorId(savedDoctor.getId());
         }
 
-        // Receptionists and laboratory staff must be approved by an administrator
-        boolean needsApproval = role.equals("RECEPTIONIST") || role.equals("LAB_STAFF");
+        // Receptionists, laboratory staff and pharmacists must be approved by an administrator
+        boolean needsApproval = role.equals("RECEPTIONIST") || role.equals("LAB_STAFF") || role.equals("PHARMACIST");
 
         if (needsApproval) {
             user.setApproved(false);
@@ -212,7 +224,7 @@ public class AuthController {
         request.setAttribute("auditActor", username);
         request.setAttribute("auditRole", role);
         request.setAttribute("auditDetail", needsApproval
-                ? (role.equals("LAB_STAFF") ? "Laboratory staff" : "Receptionist") + " application submitted"
+                ? staffTitle(role) + " application submitted"
                 : "Account created (" + role.toLowerCase() + ")");
 
         String sent = "A 6-digit verification code was sent to " + email + " and works for "

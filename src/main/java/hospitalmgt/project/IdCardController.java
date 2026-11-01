@@ -53,6 +53,7 @@ public class IdCardController {
             case "DOCTOR": return "Doctor";
             case "RECEPTIONIST": return "Receptionist";
             case "LAB_STAFF": return "Laboratory Staff";
+            case "PHARMACIST": return "Pharmacist";
             case "PATIENT": return "Patient";
             default: return role;
         }

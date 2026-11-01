@@ -72,7 +72,7 @@ public class DashboardController {
                 card(cards, "Prescriptions waiting", prescriptionRepository.findAll().stream().filter(p -> !p.isDispensed()).count(), "number");
                 card(cards, "Low stock medicines", medicines.stream().filter(m -> m.getStockQuantity() < 10).count(), "number");
                 card(cards, "Visitors in building", visitorsIn(), "number");
-                card(cards, "Staff applications", userRepository.findByRequestedRoleInAndApprovedFalse(List.of("RECEPTIONIST", "LAB_STAFF")).size(), "number");
+                card(cards, "Staff applications", userRepository.findByRequestedRoleInAndApprovedFalse(List.of("RECEPTIONIST", "LAB_STAFF", "PHARMACIST")).size(), "number");
                 card(cards, "Emergency patients", patientRepository.findByEmergencyPatientTrue().size(), "number");
                 card(cards, "Audit events today", auditToday(today), "number");
 
@@ -136,6 +136,51 @@ public class DashboardController {
                     row.put("detail", tests + (tests == 1 ? " test" : " tests")
                             + ("URGENT".equals(o.getPriority()) ? " · Urgent" : "")
                             + " · " + labStatusLabel(o.getStatus()));
+                    upcoming.add(row);
+                }
+                break;
+            }
+            case "PHARMACIST": {
+                title = "Pharmacy overview";
+                upcomingTitle = "Prescriptions waiting to be dispensed";
+                List<Prescription> prescriptions = prescriptionRepository.findAll();
+                List<Prescription> waiting = prescriptions.stream().filter(p -> !p.isDispensed()).toList();
+                List<Medicine> medicines = medicineRepository.findAll();
+                LocalDate soon = LocalDate.now().plusDays(30);
+
+                card(cards, "Prescriptions waiting", waiting.size(), "number");
+                card(cards, "Dispensed today", prescriptions.stream()
+                        .filter(p -> p.isDispensed() && p.getDispensedAt() != null
+                                && p.getDispensedAt().toLocalDate().toString().equals(today))
+                        .count(), "number");
+                card(cards, "Dispensed (all time)", prescriptions.stream().filter(Prescription::isDispensed).count(), "number");
+                card(cards, "Medicines in stock", medicines.size(), "number");
+                card(cards, "Low stock medicines", medicines.stream()
+                        .filter(m -> m.getStockQuantity() < Medicine.LOW_STOCK_LIMIT).count(), "number");
+                card(cards, "Out of stock", medicines.stream().filter(m -> m.getStockQuantity() == 0).count(), "number");
+                card(cards, "Categories low on stock", medicines.stream()
+                        .filter(m -> m.getStockQuantity() < Medicine.LOW_STOCK_LIMIT)
+                        .map(Medicine::categoryOf)
+                        .distinct()
+                        .count(), "number");
+                card(cards, "Expiring within 30 days", medicines.stream()
+                        .filter(m -> m.getExpiryDate() != null
+                                && !m.getExpiryDate().isBefore(LocalDate.now())
+                                && !m.getExpiryDate().isAfter(soon))
+                        .count(), "number");
+
+                List<Prescription> oldestFirst = waiting.stream()
+                        .sorted(Comparator.comparing((Prescription p) -> issuedAt(p) == null ? LocalDateTime.MAX : issuedAt(p)))
+                        .limit(8)
+                        .toList();
+                for (Prescription p : oldestFirst) {
+                    int count = p.getItems() == null ? 0 : p.getItems().size();
+                    LocalDateTime issued = issuedAt(p);
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("when", issued == null ? null : issued.toString());
+                    row.put("title", p.getPatientName());
+                    row.put("detail", count + (count == 1 ? " medication" : " medications")
+                            + (p.getDoctorName() == null ? "" : " · " + p.getDoctorName()));
                     upcoming.add(row);
                 }
                 break;
@@ -245,6 +290,12 @@ public class DashboardController {
 
     private long countToday(List<Appointment> list, String today) {
         return list.stream().filter(a -> isToday(a, today)).count();
+    }
+
+    private LocalDateTime issuedAt(Prescription p) {
+        if (p.getCreatedAt() != null) return p.getCreatedAt();
+        if (p.getDateIssued() != null) return p.getDateIssued().atStartOfDay();
+        return null;
     }
 
     // ---------- helpers ----------

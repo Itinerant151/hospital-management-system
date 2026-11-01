@@ -151,7 +151,8 @@ public class PrescriptionController {
         return cleaned;
     }
 
-    // Marks a prescription dispensed and takes the quantities out of the pharmacy stock
+    // Marks a prescription dispensed and takes the quantities out of the pharmacy stock.
+    // Everything is checked first, so nothing leaves stock unless the whole prescription can be filled.
     @PostMapping("/{id}/dispense")
     public Prescription dispense(@PathVariable String id, HttpServletRequest request) {
         Prescription prescription = prescriptionRepository.findById(id)
@@ -160,19 +161,41 @@ public class PrescriptionController {
             throw new ApiException(409, "This prescription has already been dispensed.");
         }
 
+        Map<String, Integer> needed = new LinkedHashMap<>();   // medicineId -> units needed
         if (prescription.getItems() != null) {
             for (Prescription.PrescribedItem item : prescription.getItems()) {
                 if (item.getMedicineId() == null || item.getMedicineId().isBlank()) continue;
-                Medicine medicine = medicineRepository.findById(item.getMedicineId()).orElse(null);
-                if (medicine != null) {
-                    medicine.setStockQuantity(Math.max(0, medicine.getStockQuantity() - item.getQuantity()));
-                    medicineRepository.save(medicine);
-                }
+                needed.merge(item.getMedicineId(), item.getQuantity(), Integer::sum);
             }
+        }
+
+        List<String> problems = new ArrayList<>();
+        Map<String, Medicine> medicines = new LinkedHashMap<>();
+        for (Map.Entry<String, Integer> entry : needed.entrySet()) {
+            Medicine medicine = medicineRepository.findById(entry.getKey()).orElse(null);
+            if (medicine == null) continue;   // removed from the inventory since it was prescribed
+            medicines.put(entry.getKey(), medicine);
+            if (medicine.getExpiryDate() != null && medicine.getExpiryDate().isBefore(LocalDate.now())) {
+                problems.add(medicine.getName() + " has expired");
+            } else if (medicine.getStockQuantity() < entry.getValue()) {
+                problems.add(medicine.getName() + ": " + medicine.getStockQuantity()
+                        + " in stock, " + entry.getValue() + " needed");
+            }
+        }
+        if (!problems.isEmpty()) {
+            throw new ApiException(409, "This prescription cannot be dispensed yet. "
+                    + String.join("; ", problems) + ".");
+        }
+
+        for (Map.Entry<String, Medicine> entry : medicines.entrySet()) {
+            Medicine medicine = entry.getValue();
+            medicine.setStockQuantity(medicine.getStockQuantity() - needed.get(entry.getKey()));
+            medicineRepository.save(medicine);
         }
 
         prescription.setDispensed(true);
         prescription.setDispensedAt(LocalDateTime.now());
+        prescription.setDispensedBy((String) request.getAttribute("username"));
         request.setAttribute("auditDetail", "Prescription for " + prescription.getPatientName() + " dispensed");
         return prescriptionRepository.save(prescription);
     }

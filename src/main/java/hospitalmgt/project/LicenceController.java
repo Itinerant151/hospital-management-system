@@ -64,7 +64,7 @@ public class LicenceController {
     private User find(String id) {
         User u = userRepository.findById(id).orElseThrow(() -> new ApiException(404, "Person not found."));
         if (!LicenceRules.required(u.getRole())) {
-            throw new ApiException(400, "Licences are only recorded for doctors and laboratory staff.");
+            throw new ApiException(400, "Licences are only recorded for doctors, laboratory staff and pharmacists.");
         }
         return u;
     }

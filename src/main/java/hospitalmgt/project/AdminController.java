@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Staff applications: receptionists and laboratory staff sign up unapproved,
+ * Staff applications: receptionists, laboratory staff and pharmacists sign up unapproved,
  * and an administrator accepts or rejects them here.
  * (The URL still says "receptionist-requests" so SecurityConfig and the audit log keep working.)
  */
@@ -18,10 +18,18 @@ public class AdminController {
     private final UserRepository userRepository;
     public AdminController(UserRepository userRepository) { this.userRepository = userRepository; }
 
+    private String title(String role) {
+        if ("LAB_STAFF".equals(role)) return "Laboratory staff";
+        if ("PHARMACIST".equals(role)) return "Pharmacist";
+        return "Receptionist";
+    }
+
     @GetMapping("/receptionist-requests")
     public List<User> getStaffRequests() {
-        List<User> requests = new ArrayList<>(userRepository.findByRequestedRoleAndApprovedFalse("RECEPTIONIST"));
-        requests.addAll(userRepository.findByRequestedRoleAndApprovedFalse("LAB_STAFF"));
+        List<User> requests = new ArrayList<>();
+        for (String role : List.of("RECEPTIONIST", "LAB_STAFF", "PHARMACIST")) {
+            requests.addAll(userRepository.findByRequestedRoleAndApprovedFalse(role));
+        }
         return requests;
     }
 
@@ -33,8 +41,7 @@ public class AdminController {
             user.setApproved(true);
             user.setRequestedRole(null);
             request.setAttribute("auditDetail",
-                    ("LAB_STAFF".equals(requested) ? "Laboratory staff" : "Receptionist")
-                            + " application approved (" + user.getUsername() + ")");
+                    title(requested) + " application approved (" + user.getUsername() + ")");
             return ResponseEntity.ok(userRepository.save(user));
         }).orElse(ResponseEntity.notFound().build());
     }
@@ -43,8 +50,7 @@ public class AdminController {
     public ResponseEntity<Void> rejectStaff(@PathVariable String id, HttpServletRequest request) {
         return userRepository.findById(id).map(user -> {
             request.setAttribute("auditDetail",
-                    ("LAB_STAFF".equals(user.getRequestedRole()) ? "Laboratory staff" : "Receptionist")
-                            + " application rejected (" + user.getUsername() + ")");
+                    title(user.getRequestedRole()) + " application rejected (" + user.getUsername() + ")");
             userRepository.deleteById(id);
             return ResponseEntity.noContent().<Void>build();
         }).orElse(ResponseEntity.notFound().build());

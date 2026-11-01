@@ -18,7 +18,9 @@ const LICENCE_BODIES = [
 ];
 
 function defaultBody(role) {
-  return role === 'LAB_STAFF' ? 'MLSCN' : 'MDCN';
+  if (role === 'LAB_STAFF') return 'MLSCN';
+  if (role === 'PHARMACIST') return 'PCN';
+  return 'MDCN';
 }
 
 function validateName(value) {
@@ -106,8 +108,8 @@ function Signup({ onSignupSuccess }) {
   const setFieldError = (field, message) =>
     setFieldErrors((prev) => ({ ...prev, [field]: message }));
 
-  const needsPhone = role === 'DOCTOR' || role === 'RECEPTIONIST' || role === 'LAB_STAFF';
-  const needsLicence = role === 'DOCTOR' || role === 'LAB_STAFF';
+  const needsPhone = role === 'DOCTOR' || role === 'RECEPTIONIST' || role === 'LAB_STAFF' || role === 'PHARMACIST';
+  const needsLicence = role === 'DOCTOR' || role === 'LAB_STAFF' || role === 'PHARMACIST';
 
   const handleSignup = async (e) => {
     e.preventDefault();
@@ -140,7 +142,7 @@ function Signup({ onSignupSuccess }) {
         body.age = age;
         body.gender = gender;
       }
-      if (role === 'RECEPTIONIST' || role === 'LAB_STAFF') {
+      if (role === 'RECEPTIONIST' || role === 'LAB_STAFF' || role === 'PHARMACIST') {
         body.name = cleanName;
         body.phoneNumber = cleanPhone;
       }
@@ -172,7 +174,7 @@ function Signup({ onSignupSuccess }) {
   return (
     <AuthLayout
       title="Create an account"
-      subtitle="Choose the role that matches you. Staff roles need administrator approval, and doctors and laboratory staff also need a verified licence."
+      subtitle="Choose the role that matches you. Staff roles need administrator approval, and doctors, laboratory staff and pharmacists also need a verified licence."
     >
       <form className="auth-form" onSubmit={handleSignup}>
         <label className="field">
@@ -189,6 +191,7 @@ function Signup({ onSignupSuccess }) {
             <option value="DOCTOR">Doctor</option>
             <option value="RECEPTIONIST">Receptionist</option>
             <option value="LAB_STAFF">Laboratory staff</option>
+            <option value="PHARMACIST">Pharmacist</option>
           </select>
         </label>
         <label className="field">
@@ -350,4 +353,4 @@ function Signup({ onSignupSuccess }) {
   );
 }
 
-export default Signup; 
+export default Signup;

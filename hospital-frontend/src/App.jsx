@@ -8,6 +8,7 @@ import PatientPage from './PatientPage';
 import DoctorPage from './DoctorPage';
 import ReceptionistPage from './ReceptionistPage';
 import LaboratoryStaffPage from './LaboratoryStaffPage';
+import PharmacistPage from './PharmacistPage';
 import IdCardLauncher from './IdCardLauncher';
 import BackupLauncher from './BackupLauncher';
 import VerifyStaff from './VerifyStaff';
@@ -135,6 +136,10 @@ function App() {
 
   if (role === 'LAB_STAFF') {
     return withExtras(<LaboratoryStaffPage onLogout={handleLogout} />);
+  }
+
+  if (role === 'PHARMACIST') {
+    return withExtras(<PharmacistPage onLogout={handleLogout} />);
   }
 
   handleLogout();

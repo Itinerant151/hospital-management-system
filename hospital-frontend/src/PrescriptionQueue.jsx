@@ -1,85 +1,164 @@
 import { useEffect, useMemo, useState } from 'react';
 import api from './api';
+import SearchFilter from './SearchFilter';
 import { useConfirm } from './ConfirmDialog';
-import PrescriptionCard from './PrescriptionCard';
+import { formatDateTime } from './format';
 
-// Pharmacy view for the administrator: see every prescription and dispense it (stock goes down)
 function PrescriptionQueue() {
   const confirm = useConfirm();
-  const [list, setList] = useState([]);
-  const [filter, setFilter] = useState('WAITING');
+  const [prescriptions, setPrescriptions] = useState([]);
+  const [tab, setTab] = useState('waiting');
+  const [filtered, setFiltered] = useState([]);
+  const [busyId, setBusyId] = useState(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
   const load = async () => {
-    const response = await api.get('/api/prescriptions');
-    setList(response.data);
-  };
-
-  useEffect(() => {
-    load().catch(() => setError('Could not load prescriptions.'));
-  }, []);
-
-  const dispense = async (prescription) => {
-    setError('');
-    setMessage('');
-    const ok = await confirm(
-      `Dispense this prescription for ${prescription.patientName || 'the patient'}? Pharmacy stock will be reduced.`,
-      { title: 'Dispense prescription', confirmLabel: 'Dispense', danger: false }
-    );
-    if (!ok) return;
     try {
-      await api.post(`/api/prescriptions/${prescription.id}/dispense`);
-      setMessage('Prescription dispensed and stock updated.');
-      load();
+      const response = await api.get('/api/prescriptions');
+      setPrescriptions(response.data);
+      setError('');
     } catch (err) {
-      setError(err.response?.data?.message || 'Could not dispense the prescription.');
+      setError(err.response?.data?.message || 'Could not load the prescriptions. Please try again in a moment.');
     }
   };
 
-  const visible = useMemo(() => {
-    if (filter === 'WAITING') return list.filter((p) => !p.dispensed);
-    if (filter === 'DISPENSED') return list.filter((p) => p.dispensed);
-    return list;
-  }, [list, filter]);
+  useEffect(() => {
+    load();
+  }, []);
+
+  const waitingCount = prescriptions.filter((p) => !p.dispensed).length;
+  const dispensedCount = prescriptions.length - waitingCount;
+
+  // The waiting list shows the oldest first, so nobody is left waiting
+  const rows = useMemo(() => {
+    const list = prescriptions.filter((p) => (tab === 'waiting' ? !p.dispensed : p.dispensed));
+    return tab === 'waiting' ? [...list].reverse() : list;
+  }, [prescriptions, tab]);
+
+  const dispense = async (p) => {
+    const ok = await confirm(
+      `Dispense this prescription for ${p.patientName}? The quantities will be taken out of stock.`,
+      { title: 'Dispense prescription', confirmLabel: 'Dispense', danger: false }
+    );
+    if (!ok) return;
+    setBusyId(p.id);
+    setMessage('');
+    setError('');
+    try {
+      await api.post(`/api/prescriptions/${p.id}/dispense`);
+      setMessage(`Prescription for ${p.patientName} dispensed.`);
+      await load();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Could not dispense this prescription. Please try again.');
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   return (
     <div>
       <div className="page-head">
         <h1>Prescriptions</h1>
-        <p>Every prescription written by the doctors. Dispensing one takes the medicines out of the pharmacy stock.</p>
+        <p>Dispense prescriptions written by doctors. Dispensing takes the quantities out of the medicine stock.</p>
       </div>
 
       {message && <p className="alert alert-success">{message}</p>}
       {error && <p className="alert alert-error" role="alert">{error}</p>}
 
-      <div className="list-head">
-        <h2>Prescription queue</h2>
-        <div className="row-actions">
-          <select className="cell-select" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Filter prescriptions">
-            <option value="WAITING">Waiting for the pharmacy</option>
-            <option value="DISPENSED">Dispensed</option>
-            <option value="ALL">All</option>
-          </select>
-          <span className="count">{visible.length} {visible.length === 1 ? 'prescription' : 'prescriptions'}</span>
-        </div>
+      <div className="row-actions" style={{ marginBottom: '14px' }}>
+        <button
+          type="button"
+          className={`btn btn-sm ${tab === 'waiting' ? 'btn-primary' : 'btn-quiet'}`}
+          onClick={() => setTab('waiting')}
+        >
+          Waiting ({waitingCount})
+        </button>
+        <button
+          type="button"
+          className={`btn btn-sm ${tab === 'dispensed' ? 'btn-primary' : 'btn-quiet'}`}
+          onClick={() => setTab('dispensed')}
+        >
+          Dispensed ({dispensedCount})
+        </button>
+        <button type="button" className="btn btn-quiet btn-sm" onClick={load}>Refresh</button>
       </div>
 
-      {visible.length === 0 ? (
-        <p className="muted">No prescriptions to show.</p>
-      ) : (
-        <div className="rx-grid">
-          {visible.map((prescription) => (
-            <PrescriptionCard key={prescription.id} prescription={prescription} showPatient>
-              {!prescription.dispensed && (
-                <button type="button" className="btn btn-primary btn-sm" onClick={() => dispense(prescription)}>
-                  Dispense
-                </button>
-              )}
-            </PrescriptionCard>
-          ))}
-        </div>
-      )}
+      <SearchFilter
+        data={rows}
+        fields={['patientName', 'doctorName']}
+        onFiltered={setFiltered}
+        placeholder="Search by patient or doctor..."
+      />
+
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Issued</th>
+              <th>Patient</th>
+              <th>Prescribed by</th>
+              <th>Medications</th>
+              <th>{tab === 'waiting' ? 'Actions' : 'Dispensed'}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 && (
+              <tr>
+                <td className="empty" colSpan="5">
+                  {tab === 'waiting' ? 'No prescriptions are waiting.' : 'Nothing has been dispensed yet.'}
+                </td>
+              </tr>
+            )}
+            {filtered.map((p) => (
+              <tr key={p.id}>
+                <td>{p.createdAt ? formatDateTime(p.createdAt) : p.dateIssued}</td>
+                <td>{p.patientName}</td>
+                <td>{p.doctorName || <span className="muted">Unknown</span>}</td>
+                <td>
+                  {(p.items || []).map((item, i) => (
+                    <div key={i} style={{ marginBottom: '6px' }}>
+                      <strong>{item.medicationName}</strong> × {item.quantity}
+                      <br />
+                      <span className="muted">
+                        {item.dosage}
+                        {item.duration ? ` · ${item.duration}` : ''}
+                        {item.instructions ? ` · ${item.instructions}` : ''}
+                        {item.medicineId ? '' : ' · not tracked in stock'}
+                      </span>
+                    </div>
+                  ))}
+                  {p.notes && <div className="muted">Note: {p.notes}</div>}
+                </td>
+                <td>
+                  {p.dispensed ? (
+                    <>
+                      {p.dispensedAt ? formatDateTime(p.dispensedAt) : 'Dispensed'}
+                      {p.dispensedBy && (
+                        <>
+                          <br />
+                          <span className="muted">by {p.dispensedBy}</span>
+                        </>
+                      )}
+                    </>
+                  ) : (
+                    <div className="row-actions">
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        disabled={busyId === p.id}
+                        onClick={() => dispense(p)}
+                      >
+                        {busyId === p.id ? 'Dispensing...' : 'Dispense'}
+                      </button>
+                    </div>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

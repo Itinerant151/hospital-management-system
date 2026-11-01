@@ -15,9 +15,9 @@ public final class LicenceRules {
 
     private LicenceRules() {}
 
-    // Doctors (including visiting doctors) and laboratory staff need a licence
+    // Doctors (including visiting doctors), laboratory staff and pharmacists need a licence
     public static boolean required(String role) {
-        return "DOCTOR".equals(role) || "LAB_STAFF".equals(role);
+        return "DOCTOR".equals(role) || "LAB_STAFF".equals(role) || "PHARMACIST".equals(role);
     }
 
     public static String bodyName(String body) {

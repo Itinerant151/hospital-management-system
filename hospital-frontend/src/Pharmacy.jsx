@@ -3,14 +3,30 @@ import api from './api';
 import { useConfirm } from './ConfirmDialog';
 import { formatNaira } from './currency';
 
+const CATEGORIES = [
+  'Antibiotics',
+  'Anaesthetics',
+  'Analgesics',
+  'Antimalarials',
+  'Antihypertensives',
+  'Antidiabetics',
+  'Antihistamines',
+  'Antifungals',
+  'Vitamins & Supplements',
+  'IV Fluids',
+  'Others',
+];
+
 function Pharmacy() {
   const confirm = useConfirm();
   const [medicines, setMedicines] = useState([]);
   const [name, setName] = useState('');
+  const [category, setCategory] = useState('');
   const [stockQuantity, setStockQuantity] = useState('');
   const [price, setPrice] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
   const [editingId, setEditingId] = useState(null);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     fetchMedicines();
@@ -23,6 +39,7 @@ function Pharmacy() {
 
   const resetForm = () => {
     setName('');
+    setCategory('');
     setStockQuantity('');
     setPrice('');
     setExpiryDate('');
@@ -31,26 +48,32 @@ function Pharmacy() {
 
   const submitMedicine = async (e) => {
     e.preventDefault();
+    setError('');
     const medicineData = {
       name,
+      category,
       stockQuantity: Number(stockQuantity),
       price: Number(price),
       expiryDate: expiryDate || null,
     };
 
-    if (editingId) {
-      await api.put(`/api/medicines/${editingId}`, medicineData);
-    } else {
-      await api.post('/api/medicines', medicineData);
+    try {
+      if (editingId) {
+        await api.put(`/api/medicines/${editingId}`, medicineData);
+      } else {
+        await api.post('/api/medicines', medicineData);
+      }
+      resetForm();
+      fetchMedicines();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Could not save the medicine. Please try again.');
     }
-
-    resetForm();
-    fetchMedicines();
   };
 
   const startEditing = (med) => {
     setEditingId(med.id);
     setName(med.name);
+    setCategory(med.category || '');
     setStockQuantity(med.stockQuantity);
     setPrice(med.price);
     setExpiryDate(med.expiryDate || '');
@@ -67,7 +90,7 @@ function Pharmacy() {
     <div>
       <div className="page-head">
         <h1>Pharmacy &amp; Inventory</h1>
-        <p>Track medicine stock levels and pricing.</p>
+        <p>Track medicine stock levels, categories and pricing.</p>
       </div>
 
       <section className="panel">
@@ -76,6 +99,15 @@ function Pharmacy() {
           <label className="field">
             <span>Name</span>
             <input type="text" value={name} onChange={(e) => setName(e.target.value)} required />
+          </label>
+          <label className="field">
+            <span>Category</span>
+            <select value={category} onChange={(e) => setCategory(e.target.value)} required>
+              <option value="">Select category</option>
+              {CATEGORIES.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
           </label>
           <label className="field">
             <span>Stock quantity</span>
@@ -113,6 +145,7 @@ function Pharmacy() {
             )}
           </div>
         </form>
+        {error && <p className="alert alert-error" role="alert" style={{ marginTop: '14px' }}>{error}</p>}
       </section>
 
       <div className="list-head">
@@ -126,6 +159,7 @@ function Pharmacy() {
           <thead>
             <tr>
               <th>Name</th>
+              <th>Category</th>
               <th>Stock</th>
               <th>Price</th>
               <th>Expiry date</th>
@@ -135,7 +169,7 @@ function Pharmacy() {
           <tbody>
             {medicines.length === 0 && (
               <tr>
-                <td className="empty" colSpan="5">
+                <td className="empty" colSpan="6">
                   No medicines yet. Add the first one using the form above.
                 </td>
               </tr>
@@ -143,6 +177,7 @@ function Pharmacy() {
             {medicines.map((med) => (
               <tr key={med.id}>
                 <td>{med.name}</td>
+                <td>{med.category || <span className="muted">Uncategorised</span>}</td>
                 <td>
                   {med.stockQuantity}
                   {med.stockQuantity < 10 && (

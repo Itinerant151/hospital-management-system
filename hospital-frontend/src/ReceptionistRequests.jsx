@@ -4,9 +4,10 @@ import api from './api';
 const ROLE_LABELS = {
   RECEPTIONIST: 'Receptionist',
   LAB_STAFF: 'Laboratory staff',
+  PHARMACIST: 'Pharmacist',
 };
 
-// Pending staff applications (receptionists and laboratory staff)
+// Pending staff applications (receptionists, laboratory staff and pharmacists)
 function ReceptionistRequests() {
   const [requests, setRequests] = useState([]);
   const [message, setMessage] = useState('');
@@ -48,7 +49,7 @@ function ReceptionistRequests() {
 
   return (
     <div>
-      <div className="page-head"><h1>Staff applications</h1><p>Review receptionist and laboratory staff applications before granting access to MediCore. Laboratory staff also need their licence verified under Licence checks.</p></div>
+      <div className="page-head"><h1>Staff applications</h1><p>Review receptionist, laboratory staff and pharmacist applications before granting access to MediCore. Laboratory staff and pharmacists also need their licence verified under Licence checks.</p></div>
       {message && <p className="alert alert-success">{message}</p>}
       {error && <p className="alert alert-error" role="alert">{error}</p>}
       <div className="table-wrap">
