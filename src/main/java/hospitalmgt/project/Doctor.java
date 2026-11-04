@@ -13,6 +13,9 @@ public class Doctor {
     private String specialization;
     private String phoneNumber;
 
+    // Charged to the patient for each attended appointment. Visiting doctors use the fee on their visiting record.
+    private double consultationFee;
+
     // Constructors
     public Doctor() {
     }
@@ -54,5 +57,13 @@ public class Doctor {
 
     public void setPhoneNumber(String phoneNumber) {
         this.phoneNumber = phoneNumber;
+    }
+
+    public double getConsultationFee() {
+        return consultationFee;
+    }
+
+    public void setConsultationFee(double consultationFee) {
+        this.consultationFee = consultationFee;
     }
 }

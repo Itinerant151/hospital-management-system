@@ -27,6 +27,9 @@ public class BillController {
     @Autowired
     private PatientRepository patientRepository;
 
+    @Autowired
+    private BillingSyncService billingSyncService;
+
     @GetMapping
     public List<Bill> getAll() {
         return billRepository.findAll();
@@ -43,10 +46,88 @@ public class BillController {
         return billRepository.findByPatientId(patientId);
     }
 
+    // Staff open a patient: anything the patient owes for is added to their running bill first.
+    // Optionally the body carries extra charge lines and an HMO share to put on the same bill:
+    // { items: [{description, amount}], hmoProvider, hmoMemberNumber, hmoCoveragePercent }
+    @PostMapping("/patient/{patientId}/sync")
+    public Map<String, Object> syncPatient(@PathVariable String patientId,
+                                           @RequestBody(required = false) Map<String, Object> body,
+                                           HttpServletRequest request) {
+        if (!patientRepository.existsById(patientId)) {
+            throw new ApiException(404, "Patient not found.");
+        }
+
+        // Check everything typed in before anything is saved
+        List<Bill.BillItem> extras = cleanExtras(body);
+        double percent = 0;
+        String provider = "";
+        String member = "";
+        if (body != null) {
+            double rawPercent = toDouble(body.get("hmoCoveragePercent"));
+            percent = Double.isNaN(rawPercent) ? 0 : Bill.round(rawPercent);
+            provider = text(body.get("hmoProvider"));
+            member = text(body.get("hmoMemberNumber"));
+        }
+        if (percent < 0 || percent > 100) {
+            throw new ApiException(400, "The HMO coverage must be between 0% and 100%.");
+        }
+        if (percent > 0 && (provider.isEmpty() || member.isEmpty())) {
+            throw new ApiException(400, "Enter the HMO provider and the HMO member number.");
+        }
+
+        BillingSyncService.SyncResult result = billingSyncService.sync(patientId, extras);
+        Bill bill = result.bill();
+        List<String> notes = result.notes();
+
+        if (percent > 0) {
+            if (bill == null) {
+                notes.add("There is no bill for this patient yet, so the HMO share was not added.");
+            } else {
+                String claim = bill.getClaimStatus() == null ? "NONE" : bill.getClaimStatus();
+                boolean hasPayments = bill.getAmountPaid() > 0.005
+                        || (bill.getPayments() != null && !bill.getPayments().isEmpty());
+                if ("PAID".equals(bill.getStatus()) || bill.isHmoPaid() || hasPayments
+                        || !(claim.equals("NONE") || claim.equals("PENDING"))) {
+                    notes.add("The HMO share was not added: this bill already has a payment or a decided claim.");
+                } else {
+                    bill.setHmoProvider(provider);
+                    bill.setHmoMemberNumber(member);
+                    bill.setHmoCoveragePercent(percent);
+                    bill.setHmoCoveredAmount(Bill.round(bill.getTotal() * percent / 100.0));
+                    bill.setClaimStatus("PENDING");
+                    bill.setHmoApprovedAmount(0);
+                    bill.setHmoApprovedPercent(0);
+                    bill.setClaimNote(null);
+                    bill.setClaimUpdatedAt(LocalDateTime.now());
+                    bill.recalculateStatus();
+                    bill = billRepository.save(bill);
+                }
+            }
+        }
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("bill", bill);
+        out.put("added", result.added());
+        out.put("updated", result.updated());
+        out.put("notes", notes);
+
+        if (!result.added().isEmpty() || !result.updated().isEmpty()) {
+            request.setAttribute("auditDetail", "Patient bill brought up to date: "
+                    + result.added().size() + " new charges, " + result.updated().size() + " refreshed");
+        }
+        return out;
+    }
+
     @GetMapping("/mine")
     public List<Bill> getMine(HttpServletRequest request) {
         String patientId = (String) request.getAttribute("patientId");
         if (patientId == null) throw new ApiException(400, "No patient record is linked to this account.");
+        // The patient sees the same up-to-date running bill that staff see
+        try {
+            billingSyncService.sync(patientId);
+        } catch (RuntimeException e) {
+            System.out.println("Could not bring the running bill up to date: " + e.getMessage());
+        }
         return billRepository.findByPatientId(patientId);
     }
 
@@ -334,6 +415,34 @@ public class BillController {
         return ResponseEntity.ok().build();
     }
 
+    // The extra charge lines staff typed in, checked before anything is saved
+    private List<Bill.BillItem> cleanExtras(Map<String, Object> body) {
+        List<Bill.BillItem> result = new ArrayList<>();
+        if (body == null || !(body.get("items") instanceof List<?> list)) return result;
+
+        if (list.size() > 30) {
+            throw new ApiException(400, "You can add at most 30 charges at a time.");
+        }
+        for (Object entry : list) {
+            if (!(entry instanceof Map<?, ?> map)) {
+                throw new ApiException(400, "Every charge needs a description and an amount.");
+            }
+            String description = text(map.get("description"));
+            double amount = toDouble(map.get("amount"));
+            if (description.isEmpty() || Double.isNaN(amount) || amount <= 0) {
+                throw new ApiException(400, "Every charge needs a description and an amount above zero.");
+            }
+            if (description.length() > 200) {
+                throw new ApiException(400, "A charge description can be at most 200 characters.");
+            }
+            if (amount > 1_000_000_000) {
+                throw new ApiException(400, "That amount is too large.");
+            }
+            result.add(new Bill.BillItem(description, Bill.round(amount)));
+        }
+        return result;
+    }
+
     private void checkOwnership(Bill bill, HttpServletRequest request) {
         if ("PATIENT".equals(request.getAttribute("role"))) {
             String own = (String) request.getAttribute("patientId");
@@ -341,6 +450,10 @@ public class BillController {
                 throw new ApiException(403, "You can only use your own bills.");
             }
         }
+    }
+
+    private String text(Object value) {
+        return value == null ? "" : value.toString().trim();
     }
 
     private double toDouble(Object value) {

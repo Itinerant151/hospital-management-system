@@ -137,6 +137,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/bills/*/hmo").hasAnyRole("ADMIN", "RECEPTIONIST")
                         .requestMatchers(HttpMethod.GET, "/api/bills/mine").hasRole("PATIENT")
                         .requestMatchers(HttpMethod.GET, "/api/bills/patient/**").hasAnyRole("PATIENT", "DOCTOR", "ADMIN", "RECEPTIONIST")
+                        .requestMatchers(HttpMethod.POST, "/api/bills/patient/*/sync").hasAnyRole("ADMIN", "RECEPTIONIST")
                         .requestMatchers(HttpMethod.GET, "/api/bills").hasAnyRole("ADMIN", "RECEPTIONIST")
                         .requestMatchers(HttpMethod.POST, "/api/bills/*/pay").hasAnyRole("PATIENT", "ADMIN", "RECEPTIONIST")
                         .requestMatchers(HttpMethod.PUT, "/api/bills/*/claim").hasAnyRole("ADMIN", "RECEPTIONIST")

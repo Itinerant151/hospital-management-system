@@ -26,6 +26,9 @@ public class Bill {
     private LocalDateTime paidAt;
     private boolean paymentReminderSent = false;
 
+    // true for the patient's single running bill, which collects bed, drug and other charges automatically
+    private boolean running = false;
+
     // HMO (health insurance) part of the bill
     private String hmoProvider;
     private String hmoMemberNumber;
@@ -52,16 +55,29 @@ public class Bill {
     public static class BillItem {
         private String description;
         private double amount;
+        // Where an automatic charge came from (ADMISSION, DRUG, ...). Empty for lines typed in by staff.
+        private String sourceType;
+        private String sourceId;
 
         public BillItem() {}
         public BillItem(String description, double amount) {
             this.description = description;
             this.amount = amount;
         }
+        public BillItem(String description, double amount, String sourceType, String sourceId) {
+            this.description = description;
+            this.amount = amount;
+            this.sourceType = sourceType;
+            this.sourceId = sourceId;
+        }
         public String getDescription() { return description; }
         public void setDescription(String description) { this.description = description; }
         public double getAmount() { return amount; }
         public void setAmount(double amount) { this.amount = amount; }
+        public String getSourceType() { return sourceType; }
+        public void setSourceType(String sourceType) { this.sourceType = sourceType; }
+        public String getSourceId() { return sourceId; }
+        public void setSourceId(String sourceId) { this.sourceId = sourceId; }
     }
 
     public static class Payment {
@@ -170,6 +186,8 @@ public class Bill {
     public void setPaidAt(LocalDateTime paidAt) { this.paidAt = paidAt; }
     public boolean isPaymentReminderSent() { return paymentReminderSent; }
     public void setPaymentReminderSent(boolean paymentReminderSent) { this.paymentReminderSent = paymentReminderSent; }
+    public boolean isRunning() { return running; }
+    public void setRunning(boolean running) { this.running = running; }
     public String getHmoProvider() { return hmoProvider; }
     public void setHmoProvider(String hmoProvider) { this.hmoProvider = hmoProvider; }
     public String getHmoMemberNumber() { return hmoMemberNumber; }

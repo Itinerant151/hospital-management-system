@@ -3,6 +3,8 @@ package hospitalmgt.project;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import java.time.LocalDateTime;
+
 @Document(collection = "appointments")
 public class Appointment {
 
@@ -13,8 +15,13 @@ public class Appointment {
     private String doctorId;
     private String appointmentDate; // stored as a String for simplicity, e.g. "2026-09-20T10:00"
     private String reason;
-    private String status; // "Scheduled", "Completed", "Cancelled"
+    private String status; // "Scheduled", "Completed", "Missed", "Cancelled"
     private boolean reminderSent = false;
+
+    // Set when reception confirms the patient actually came. Only attended visits are charged.
+    private boolean attendanceConfirmed = false;
+    private LocalDateTime checkedInAt;
+    private String checkedInBy;
 
     // Constructors
     public Appointment() {
@@ -83,5 +90,29 @@ public class Appointment {
 
     public void setReminderSent(boolean reminderSent) {
         this.reminderSent = reminderSent;
+    }
+
+    public boolean isAttendanceConfirmed() {
+        return attendanceConfirmed;
+    }
+
+    public void setAttendanceConfirmed(boolean attendanceConfirmed) {
+        this.attendanceConfirmed = attendanceConfirmed;
+    }
+
+    public LocalDateTime getCheckedInAt() {
+        return checkedInAt;
+    }
+
+    public void setCheckedInAt(LocalDateTime checkedInAt) {
+        this.checkedInAt = checkedInAt;
+    }
+
+    public String getCheckedInBy() {
+        return checkedInBy;
+    }
+
+    public void setCheckedInBy(String checkedInBy) {
+        this.checkedInBy = checkedInBy;
     }
 }

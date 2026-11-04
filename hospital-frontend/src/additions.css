@@ -246,3 +246,16 @@
   background: #493b16;
   color: #ffe08a;
 }
+
+/* ---------- Missed appointments ---------- */
+
+.badge-missed {
+  background: var(--warn-bg, #fff3d6);
+  color: var(--warn, #8a5a00);
+}
+
+.status-select[data-status='Missed'] {
+  background: var(--warn-bg, #fff3d6);
+  color: var(--warn, #8a5a00);
+  border-color: var(--warn-line, #f0d28a);
+}

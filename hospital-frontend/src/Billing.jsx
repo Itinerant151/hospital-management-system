@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import api from './api';
 import { useConfirm } from './ConfirmDialog';
 import { formatNaira } from './currency';
@@ -10,9 +10,30 @@ import { STAFF_METHODS, statusBadge, statusLabel, claimBadge, claimLabel, lastRe
 
 const EMPTY_ITEMS = [{ description: '', amount: '' }];
 
+// Looks like a plain link so a patient's name reads as clickable in any theme
+const nameLink = {
+  background: 'none',
+  border: 'none',
+  padding: 0,
+  font: 'inherit',
+  color: 'inherit',
+  textDecoration: 'underline',
+  cursor: 'pointer',
+  textAlign: 'left',
+};
+
+// Tells staff which kind of bill a charge sits on
+const billLabel = (bill) => {
+  if (bill.running) return 'Running bill';
+  if (bill.laboratoryOrderId) return 'Laboratory bill';
+  if (bill.appointmentId) return 'Consultation bill';
+  return 'Bill';
+};
+
 function Billing() {
   const confirm = useConfirm();
   const role = localStorage.getItem('role');
+  const formRef = useRef(null);
 
   const [bills, setBills] = useState([]);
   const [patients, setPatients] = useState([]);
@@ -22,8 +43,14 @@ function Billing() {
   const [receipt, setReceipt] = useState(null);       // { billId, payment }
   const [hmoReceiptFor, setHmoReceiptFor] = useState(null);
 
-  // Create-bill form
+  // The patient chosen in the form, and what bringing their charges up to date did
   const [patientId, setPatientId] = useState('');
+  const [syncInfo, setSyncInfo] = useState(null);
+  const [syncing, setSyncing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState('');
+
+  // Extra charges and HMO for the bill
   const [items, setItems] = useState(EMPTY_ITEMS);
   const [hmoOn, setHmoOn] = useState(false);
   const [hmoProvider, setHmoProvider] = useState('');
@@ -47,61 +74,148 @@ function Billing() {
 
   const patientName = (id) => patients.find((p) => p.id === id)?.name || 'Unknown';
 
-  const total = items.reduce((sum, it) => sum + (Number(it.amount) || 0), 0);
-  const percent = hmoOn ? Math.min(100, Math.max(0, Number(hmoPercent) || 0)) : 0;
-  const covered = Math.round(total * percent) / 100;
+  // Choosing a patient brings their charges up to date and shows them in the form
+  const selectPatient = async (id, scrollToForm = false) => {
+    setError('');
+    setMessage('');
+    setSyncInfo(null);
+    setItems(EMPTY_ITEMS);
+    setHmoPercent('');
+    setSearch('');
 
-  const choosePatient = (id) => {
+    if (!id) {
+      setPatientId('');
+      setHmoOn(false);
+      setHmoProvider('');
+      setHmoMember('');
+      return;
+    }
+
     setPatientId(id);
+    setFilter('ALL');
+
     // Use the insurance details already on the patient's record
     const patient = patients.find((p) => p.id === id);
     if (patient && patient.insuranceProvider) {
       setHmoOn(true);
       setHmoProvider(patient.insuranceProvider);
       setHmoMember(patient.insuranceNumber || '');
+    } else {
+      setHmoOn(false);
+      setHmoProvider('');
+      setHmoMember('');
+    }
+
+    if (scrollToForm && formRef.current) {
+      formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    setSyncing(true);
+    try {
+      const response = await api.post(`/api/bills/patient/${id}/sync`);
+      setSyncInfo(response.data);
+      await fetchBills();
+    } catch (err) {
+      setError(err.response?.data?.message || "Could not bring this patient's charges up to date.");
+    } finally {
+      setSyncing(false);
     }
   };
+
+  const matches = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return [];
+    return patients.filter((p) => (p.name || '').toLowerCase().includes(q)).slice(0, 12);
+  }, [patients, search]);
+
+  // Everything the chosen patient still has to pay, from all of their unpaid bills
+  const patientBills = useMemo(
+    () => (patientId ? bills.filter((b) => b.patientId === patientId) : []),
+    [bills, patientId]
+  );
+  const outstanding = patientBills.filter((b) => b.status !== 'PAID');
+  const outstandingLines = outstanding.flatMap((b) =>
+    (b.items || []).map((it, i) => ({
+      key: `${b.id}-${i}`,
+      description: it.description,
+      amount: it.amount,
+      label: billLabel(b),
+    }))
+  );
+  const owed = outstanding.reduce((sum, b) => sum + (b.balance || 0), 0);
+
+  // Whether the HMO share can still be set on the patient's running bill
+  const runningBill = patientBills.find((b) => b.running) || null;
+  const runningClaim = runningBill?.claimStatus || 'NONE';
+  const runningHasPayments = Boolean(
+    runningBill && ((runningBill.amountPaid || 0) > 0 || (runningBill.payments || []).length > 0)
+  );
+  const runningHasHmo = Boolean(runningBill && runningBill.hmoCoveredAmount > 0);
+  const hmoLocked = Boolean(
+    runningBill &&
+      (runningBill.hmoPaid ||
+        runningBill.status === 'PAID' ||
+        runningHasPayments ||
+        !(runningClaim === 'NONE' || runningClaim === 'PENDING'))
+  );
+  const showHmoFields = !runningHasHmo && !hmoLocked;
+
+  const manualTotal = items.reduce((sum, it) => sum + (Number(it.amount) || 0), 0);
+  const billTotal = Math.round(((runningBill ? runningBill.total : 0) + manualTotal) * 100) / 100;
+  const percent = hmoOn ? Math.min(100, Math.max(0, Number(hmoPercent) || 0)) : 0;
+  let covered = 0;
+  if (runningHasHmo) {
+    covered =
+      runningClaim === 'PENDING'
+        ? Math.round(billTotal * runningBill.hmoCoveragePercent) / 100
+        : runningBill.hmoAmount || 0;
+  } else if (showHmoFields && hmoOn) {
+    covered = Math.round(billTotal * percent) / 100;
+  }
+  const shownPercent = runningHasHmo ? runningBill.hmoCoveragePercent : percent;
 
   const updateItem = (index, field, value) =>
     setItems((prev) => prev.map((it, i) => (i === index ? { ...it, [field]: value } : it)));
 
-  const resetForm = () => {
-    setPatientId('');
-    setItems(EMPTY_ITEMS);
-    setHmoOn(false);
-    setHmoProvider('');
-    setHmoMember('');
-    setHmoPercent('');
-  };
-
-  const createBill = async (e) => {
+  // Saves the extra charges (and the HMO share) onto the patient's bill
+  const saveCharges = async (e) => {
     e.preventDefault();
     setError('');
     setMessage('');
-    const cleanItems = items
-      .filter((it) => it.description && it.amount !== '')
-      .map((it) => ({ description: it.description, amount: Number(it.amount) }));
-    if (!patientId || cleanItems.length === 0) {
-      setError('Choose a patient and add at least one line item.');
+    if (!patientId) {
+      setError('Choose a patient first.');
       return;
     }
-    if (hmoOn && (Number(hmoPercent) <= 0 || Number(hmoPercent) > 100)) {
+    const extras = items
+      .filter((it) => it.description && it.amount !== '')
+      .map((it) => ({ description: it.description, amount: Number(it.amount) }));
+    const addHmo = showHmoFields && hmoOn;
+    if (addHmo && (Number(hmoPercent) <= 0 || Number(hmoPercent) > 100)) {
       setError('Enter an HMO coverage between 1% and 100%.');
       return;
     }
+    if (extras.length === 0 && !addHmo) {
+      setError('Add a charge below, or add an HMO share, before saving.');
+      return;
+    }
+
+    setSaving(true);
     try {
-      await api.post('/api/bills', {
-        patientId,
-        items: cleanItems,
-        hmoProvider: hmoOn ? hmoProvider : null,
-        hmoMemberNumber: hmoOn ? hmoMember : null,
-        hmoCoveragePercent: hmoOn ? Number(hmoPercent) : 0,
+      const response = await api.post(`/api/bills/patient/${patientId}/sync`, {
+        items: extras,
+        hmoProvider: addHmo ? hmoProvider : null,
+        hmoMemberNumber: addHmo ? hmoMember : null,
+        hmoCoveragePercent: addHmo ? Number(hmoPercent) : 0,
       });
-      resetForm();
-      setMessage('Bill created.');
-      fetchBills();
+      setSyncInfo(response.data);
+      setItems(EMPTY_ITEMS);
+      setHmoPercent('');
+      setMessage("Saved on the patient's bill.");
+      await fetchBills();
     } catch (err) {
-      setError(err.response?.data?.message || 'Could not create the bill.');
+      setError(err.response?.data?.message || 'Could not save the charges.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -138,17 +252,22 @@ function Billing() {
   };
 
   const visible = useMemo(() => {
-    if (filter === 'OUTSTANDING') return bills.filter((b) => b.status !== 'PAID');
-    if (filter === 'HMO') return bills.filter((b) => b.hmoCoveredAmount > 0);
-    if (filter === 'PAID') return bills.filter((b) => b.status === 'PAID');
-    return bills;
-  }, [bills, filter]);
+    const base = patientId ? bills.filter((b) => b.patientId === patientId) : bills;
+    if (filter === 'OUTSTANDING') return base.filter((b) => b.status !== 'PAID');
+    if (filter === 'HMO') return base.filter((b) => b.hmoCoveredAmount > 0);
+    if (filter === 'PAID') return base.filter((b) => b.status === 'PAID');
+    return base;
+  }, [bills, filter, patientId]);
+
+  const added = syncInfo?.added || [];
+  const updated = syncInfo?.updated || [];
+  const notes = syncInfo?.notes || [];
 
   return (
     <div>
       <div className="page-head">
         <h1>Billing</h1>
-        <p>Create bills, split them with the patient's HMO by percentage, record payments and print receipts. Claim approvals are on the HMO claims page.</p>
+        <p>Choose a patient to see everything they owe, add other charges, split the bill with the patient's HMO by percentage, record payments and print receipts. Claim approvals are on the HMO claims page.</p>
       </div>
 
       {message && <p className="alert alert-success">{message}</p>}
@@ -182,11 +301,33 @@ function Billing() {
       )}
 
       <section className="panel">
+        <h2 className="panel-title">Find a patient</h2>
+        <p className="muted">
+          Type a name and click the patient. Their charges for the bed, dispensed drugs and attended consultations are added to their bill and shown in the form below.
+          You can also click a patient's name in the table.
+        </p>
+        <label className="field">
+          <span>Patient name</span>
+          <input type="text" placeholder="Start typing a name" value={search} onChange={(e) => setSearch(e.target.value)} />
+        </label>
+        {matches.length > 0 && (
+          <div className="row-actions" style={{ flexWrap: 'wrap', marginTop: '8px' }}>
+            {matches.map((p) => (
+              <button key={p.id} type="button" className="btn btn-quiet btn-sm" disabled={syncing} onClick={() => selectPatient(p.id, true)}>
+                {p.name}
+              </button>
+            ))}
+          </div>
+        )}
+        {search.trim() && matches.length === 0 && <p className="muted">No patient matches that name.</p>}
+      </section>
+
+      <section className="panel" ref={formRef}>
         <h2 className="panel-title">Create a bill</h2>
-        <form className="form-grid" onSubmit={createBill}>
+        <form className="form-grid" onSubmit={saveCharges}>
           <label className="field">
             <span>Patient</span>
-            <select value={patientId} onChange={(e) => choosePatient(e.target.value)} required>
+            <select value={patientId} onChange={(e) => selectPatient(e.target.value)}>
               <option value="">Select a patient</option>
               {patients.map((p) => (
                 <option key={p.id} value={p.id}>{p.name}</option>
@@ -194,66 +335,146 @@ function Billing() {
             </select>
           </label>
 
-          <div className="field field-full">
-            <span>Line items</span>
-            {items.map((item, i) => (
-              <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                <input type="text" placeholder="Description" value={item.description} onChange={(e) => updateItem(i, 'description', e.target.value)} />
-                <input type="number" min="0" step="0.01" placeholder="Amount (₦)" value={item.amount} onChange={(e) => updateItem(i, 'amount', e.target.value)} style={{ maxWidth: '140px' }} />
-                {items.length > 1 && (
-                  <button type="button" className="btn btn-quiet btn-sm" onClick={() => setItems((prev) => prev.filter((_, idx) => idx !== i))}>
-                    Remove
-                  </button>
-                )}
-              </div>
-            ))}
-            <div>
-              <button type="button" className="btn btn-quiet btn-sm" onClick={() => setItems((prev) => [...prev, { description: '', amount: '' }])}>
-                + Add line item
-              </button>
+          {!patientId && (
+            <div className="field field-full">
+              <p className="muted" style={{ margin: 0 }}>Choose a patient to see what they owe.</p>
             </div>
-          </div>
-
-          <label className="field field-full check-row">
-            <input type="checkbox" checked={hmoOn} onChange={(e) => setHmoOn(e.target.checked)} />
-            <span>Part of this bill is covered by an HMO</span>
-          </label>
-
-          {hmoOn && (
-            <>
-              <label className="field">
-                <span>HMO provider</span>
-                <input type="text" value={hmoProvider} onChange={(e) => setHmoProvider(e.target.value)} required />
-              </label>
-              <label className="field">
-                <span>HMO member number</span>
-                <input type="text" value={hmoMember} onChange={(e) => setHmoMember(e.target.value)} required />
-              </label>
-              <label className="field">
-                <span>HMO coverage (%)</span>
-                <input type="number" min="1" max="100" step="0.5" placeholder="e.g. 80" value={hmoPercent} onChange={(e) => setHmoPercent(e.target.value)} required />
-                <small className="field-hint">The share of the bill the HMO pays. The patient pays the rest.</small>
-              </label>
-            </>
           )}
 
-          <div className="field field-full">
-            <div className="summary-strip">
-              <div><span>Bill total</span><strong>{formatNaira(total)}</strong></div>
-              <div><span>HMO covers {hmoOn ? percentText(percent) : ''}</span><strong>{formatNaira(covered)}</strong></div>
-              <div><span>Patient pays</span><strong>{formatNaira(Math.max(0, total - covered))}</strong></div>
-            </div>
-          </div>
+          {patientId && (
+            <>
+              <div className="field field-full">
+                <span>Charges for {patientName(patientId)}</span>
+                {syncing && <p className="muted">Bringing the charges up to date...</p>}
+                {!syncing && outstandingLines.length === 0 && (
+                  <p className="muted">Nothing is outstanding for this patient right now.</p>
+                )}
+                {outstandingLines.length > 0 && (
+                  <div className="table-wrap">
+                    <table>
+                      <thead>
+                        <tr><th>Description</th><th>Bill</th><th>Price</th></tr>
+                      </thead>
+                      <tbody>
+                        {outstandingLines.map((line) => (
+                          <tr key={line.key}>
+                            <td>{line.description}</td>
+                            <td><span className="notif-meta">{line.label}</span></td>
+                            <td>{formatNaira(line.amount)}</td>
+                          </tr>
+                        ))}
+                        <tr>
+                          <td colSpan="2"><strong>Still to be paid by the patient</strong></td>
+                          <td><strong>{formatNaira(owed)}</strong></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                {added.length > 0 && (
+                  <div style={{ marginTop: '10px' }}>
+                    <strong>Added just now</strong>
+                    {added.map((line, i) => <div key={i}>{line}</div>)}
+                  </div>
+                )}
+                {updated.length > 0 && (
+                  <div style={{ marginTop: '10px' }}>
+                    <strong>Brought up to date</strong>
+                    {updated.map((line, i) => <div key={i}>{line}</div>)}
+                  </div>
+                )}
+                {notes.map((note, i) => <p key={i} className="notif-meta">{note}</p>)}
+              </div>
 
-          <div className="form-actions">
-            <button type="submit" className="btn btn-primary">Create bill</button>
-          </div>
+              <div className="field field-full">
+                <span>Add other charges (optional)</span>
+                {items.map((item, i) => (
+                  <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                    <input type="text" placeholder="Description" value={item.description} onChange={(e) => updateItem(i, 'description', e.target.value)} />
+                    <input type="number" min="0" step="0.01" placeholder="Amount (₦)" value={item.amount} onChange={(e) => updateItem(i, 'amount', e.target.value)} style={{ maxWidth: '140px' }} />
+                    {items.length > 1 && (
+                      <button type="button" className="btn btn-quiet btn-sm" onClick={() => setItems((prev) => prev.filter((_, idx) => idx !== i))}>
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <div>
+                  <button type="button" className="btn btn-quiet btn-sm" onClick={() => setItems((prev) => [...prev, { description: '', amount: '' }])}>
+                    + Add line item
+                  </button>
+                </div>
+              </div>
+
+              {runningHasHmo && (
+                <div className="field field-full">
+                  <p className="muted" style={{ margin: 0 }}>
+                    This bill already has HMO cover ({runningBill.hmoProvider}, {percentText(runningBill.hmoCoveragePercent)}).
+                    Use Edit HMO in the table to change it.
+                  </p>
+                </div>
+              )}
+              {!runningHasHmo && hmoLocked && (
+                <div className="field field-full">
+                  <p className="muted" style={{ margin: 0 }}>
+                    An HMO can no longer be added here because this bill already has a payment or a decided claim.
+                  </p>
+                </div>
+              )}
+
+              {showHmoFields && (
+                <>
+                  <label className="field field-full check-row">
+                    <input type="checkbox" checked={hmoOn} onChange={(e) => setHmoOn(e.target.checked)} />
+                    <span>Part of this bill is covered by an HMO</span>
+                  </label>
+
+                  {hmoOn && (
+                    <>
+                      <label className="field">
+                        <span>HMO provider</span>
+                        <input type="text" value={hmoProvider} onChange={(e) => setHmoProvider(e.target.value)} required />
+                      </label>
+                      <label className="field">
+                        <span>HMO member number</span>
+                        <input type="text" value={hmoMember} onChange={(e) => setHmoMember(e.target.value)} required />
+                      </label>
+                      <label className="field">
+                        <span>HMO coverage (%)</span>
+                        <input type="number" min="1" max="100" step="0.5" placeholder="e.g. 80" value={hmoPercent} onChange={(e) => setHmoPercent(e.target.value)} required />
+                        <small className="field-hint">The share of the bill the HMO pays. The patient pays the rest.</small>
+                      </label>
+                    </>
+                  )}
+                </>
+              )}
+
+              <div className="field field-full">
+                <div className="summary-strip">
+                  <div><span>Bill total</span><strong>{formatNaira(billTotal)}</strong></div>
+                  <div><span>HMO covers {shownPercent > 0 ? percentText(shownPercent) : ''}</span><strong>{formatNaira(covered)}</strong></div>
+                  <div><span>Patient pays</span><strong>{formatNaira(Math.max(0, billTotal - covered))}</strong></div>
+                </div>
+              </div>
+
+              <div className="form-actions">
+                <button type="submit" className="btn btn-primary" disabled={saving || syncing}>
+                  {saving ? 'Saving...' : runningBill ? 'Add to the bill' : 'Create bill'}
+                </button>
+              </div>
+            </>
+          )}
         </form>
       </section>
 
       <div className="list-head">
-        <h2>All bills</h2>
+        <h2>{patientId ? `Bills for ${patientName(patientId)}` : 'All bills'}</h2>
         <div className="row-actions">
+          {patientId && (
+            <button type="button" className="btn btn-quiet btn-sm" onClick={() => selectPatient('')}>
+              Show all bills
+            </button>
+          )}
           <select className="cell-select" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Filter bills">
             <option value="ALL">All bills</option>
             <option value="OUTSTANDING">Outstanding</option>
@@ -283,7 +504,18 @@ function Billing() {
             )}
             {visible.map((bill) => (
               <tr key={bill.id}>
-                <td>{patientName(bill.patientId)}</td>
+                <td>
+                  <button
+                    type="button"
+                    style={nameLink}
+                    title="Show this patient's charges in the form"
+                    disabled={syncing}
+                    onClick={() => selectPatient(bill.patientId, true)}
+                  >
+                    {patientName(bill.patientId)}
+                  </button>
+                  {bill.running && <div className="notif-meta">Running bill</div>}
+                </td>
                 <td>
                   {(bill.items || []).map((it, i) => (
                     <div key={i}>{it.description} — {formatNaira(it.amount)}</div>

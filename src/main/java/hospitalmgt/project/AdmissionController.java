@@ -3,7 +3,6 @@ package hospitalmgt.project;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -17,16 +16,19 @@ public class AdmissionController {
     private final PatientRepository patientRepository;
     private final DoctorRepository doctorRepository;
     private final BillRepository billRepository;
+    private final BillingSyncService billingSync;
 
     public AdmissionController(AdmissionRepository admissionRepository, BedRepository bedRepository,
                                WardRepository wardRepository, PatientRepository patientRepository,
-                               DoctorRepository doctorRepository, BillRepository billRepository) {
+                               DoctorRepository doctorRepository, BillRepository billRepository,
+                               BillingSyncService billingSync) {
         this.admissionRepository = admissionRepository;
         this.bedRepository = bedRepository;
         this.wardRepository = wardRepository;
         this.patientRepository = patientRepository;
         this.doctorRepository = doctorRepository;
         this.billRepository = billRepository;
+        this.billingSync = billingSync;
     }
 
     // ---------- reading ----------
@@ -52,7 +54,7 @@ public class AdmissionController {
     @GetMapping("/{id}/charges")
     public Map<String, Object> chargesNow(@PathVariable String id) {
         Admission admission = find(id);
-        Charges charges = charges(admission, endOf(admission));
+        BillingSyncService.BedCharges charges = billingSync.bedCharges(admission, endOf(admission));
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("items", charges.items());
         result.put("total", charges.total());
@@ -178,20 +180,10 @@ public class AdmissionController {
         Admission.Stay current = currentStay(admission);
         if (current != null) current.setEndedAt(now);
 
-        // Bed charges become an ordinary bill, so payment and HMO cover work as for any other bill
-        Charges charges = charges(admission, now);
-        Bill bill = new Bill();
-        bill.setPatientId(admission.getPatientId());
-        bill.setItems(charges.items());
-        bill.setTotal(charges.total());
-        bill.recalculateStatus();
-        Bill savedBill = billRepository.save(bill);
-
         admission.setStatus("DISCHARGED");
         admission.setDischargedAt(now);
         admission.setDischargedBy(username);
         admission.setDischargeNote(note.isEmpty() ? null : note);
-        admission.setBillId(savedBill.getId());
         admissionRepository.save(admission);
 
         if (current != null) {
@@ -202,50 +194,18 @@ public class AdmissionController {
             });
         }
 
+        // The final bed charges go on the patient's running bill, together with drugs and other charges
+        BillingSyncService.BedCharges charges = billingSync.bedCharges(admission, now);
+        BillingSyncService.SyncResult synced = billingSync.sync(admission.getPatientId());
+        if (synced.bill() != null) {
+            admission.setBillId(synced.bill().getId());
+            admissionRepository.save(admission);
+        }
+
         String name = patientRepository.findById(admission.getPatientId()).map(Patient::getName).orElse("Patient");
         request.setAttribute("auditDetail", name + " discharged; bed charges of NGN "
-                + String.format(Locale.US, "%,.2f", charges.total()) + " billed");
+                + String.format(Locale.US, "%,.2f", charges.total()) + " added to the running bill");
         return views(List.of(admission)).get(0);
-    }
-
-    // ---------- charges ----------
-
-    private record Charges(List<Bill.BillItem> items, double total, double days) {}
-
-    /**
-     * Bed charges, worked out per stay: daily rate x days spent (to the minute).
-     * If the whole admission lasted under one day, a top-up line makes it one full day.
-     */
-    private Charges charges(Admission admission, LocalDateTime end) {
-        List<Bill.BillItem> items = new ArrayList<>();
-        double totalDays = 0;
-        double total = 0;
-        double lastRate = 0;
-
-        for (Admission.Stay stay : admission.getStays()) {
-            LocalDateTime to = stay.getEndedAt() != null ? stay.getEndedAt() : end;
-            long minutes = Math.max(0, Duration.between(stay.getStartedAt(), to).toMinutes());
-            double days = minutes / 1440.0;
-            double amount = Bill.round(stay.getDailyRate() * days);
-
-            totalDays += days;
-            total += amount;
-            lastRate = stay.getDailyRate();
-
-            if (amount > 0.005) {
-                items.add(new Bill.BillItem("Bed charge - " + stay.getWardName() + ", bed " + stay.getBedLabel()
-                        + " (" + dayText(days) + " at " + money(stay.getDailyRate()) + " a day)", amount));
-            }
-        }
-
-        if (totalDays < 1 && lastRate > 0) {
-            double topUp = Bill.round(lastRate * (1 - totalDays));
-            items.add(new Bill.BillItem("Minimum charge of one day (top-up)", topUp));
-            total += topUp;
-            totalDays = 1;
-        }
-
-        return new Charges(items, Bill.round(total), Bill.round(totalDays));
     }
 
     // ---------- views ----------
@@ -277,7 +237,7 @@ public class AdmissionController {
         if (shown == null && !admission.getStays().isEmpty()) {
             shown = admission.getStays().get(admission.getStays().size() - 1);
         }
-        Charges charges = charges(admission, endOf(admission));
+        BillingSyncService.BedCharges charges = billingSync.bedCharges(admission, endOf(admission));
 
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("id", admission.getId());
@@ -345,14 +305,6 @@ public class AdmissionController {
         stay.setTransferReason(transferReason);
         stay.setMovedBy(movedBy);
         return stay;
-    }
-
-    private String dayText(double days) {
-        return String.format(Locale.US, "%.2f %s", days, Math.abs(days - 1) < 0.005 ? "day" : "days");
-    }
-
-    private String money(double value) {
-        return "NGN " + String.format(Locale.US, "%,.2f", value);
     }
 
     private String text(Map<String, Object> body, String key) {

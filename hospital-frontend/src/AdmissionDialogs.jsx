@@ -181,7 +181,7 @@ export function DischargeDialog({ admission, onClose, onDone }) {
     setBusy(true);
     try {
       const response = await api.post(`/api/admissions/${admission.id}/discharge`, { note });
-      onDone(`${response.data.patientName} discharged. A bed-charge bill of ${formatNaira(response.data.charges)} was created.`);
+      onDone(`${response.data.patientName} discharged. Bed charges of ${formatNaira(response.data.charges)} were added to the patient's running bill.`);
     } catch (err) {
       setError(err.response?.data?.message || 'Could not discharge the patient.');
       setBusy(false);
@@ -191,7 +191,7 @@ export function DischargeDialog({ admission, onClose, onDone }) {
   return (
     <Overlay title={`Discharge ${admission.patientName}`} onClose={onClose}>
       <form onSubmit={submit}>
-        <h3 style={{ marginBottom: '8px' }}>Bed charges to be billed</h3>
+        <h3 style={{ marginBottom: '8px' }}>Bed charges to be added to the patient's bill</h3>
         {!charges && !error && <p className="muted">Working out the charges...</p>}
         {charges && (
           <>
@@ -221,7 +221,7 @@ export function DischargeDialog({ admission, onClose, onDone }) {
         {error && <p className="alert alert-error" role="alert" style={{ marginTop: '14px' }}>{error}</p>}
         <div className="form-actions" style={{ marginTop: '18px' }}>
           <button type="submit" className="btn btn-primary" disabled={busy || !charges}>
-            Discharge and create bill
+            Discharge and add to bill
           </button>
           <button type="button" className="btn btn-quiet" onClick={onClose}>Cancel</button>
         </div>

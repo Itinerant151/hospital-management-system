@@ -35,6 +35,10 @@ function Appointments() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
+  // Feedback for check-in and status changes
+  const [actionError, setActionError] = useState('');
+  const [actionMessage, setActionMessage] = useState('');
+
   useEffect(() => {
     fetchAppointments();
     fetchPatients();
@@ -79,6 +83,7 @@ function Appointments() {
 
   // A visiting doctor only offers the hours in their weekly schedule
   const visiting = visitingList.find((v) => v.doctorId === doctorId);
+  const selectedDoctor = doctors.find((d) => d.id === doctorId);
   const slots = visiting ? allowedTimes(visiting, date) : ALL_SLOTS;
   const noVisitingHours = Boolean(visiting && date && slots.length === 0);
 
@@ -113,7 +118,13 @@ function Appointments() {
   };
 
   const updateStatus = async (id, newStatus) => {
-    await api.put(`/appointments/${id}/status`, { status: newStatus });
+    setActionError('');
+    setActionMessage('');
+    try {
+      await api.put(`/appointments/${id}/status`, { status: newStatus });
+    } catch (err) {
+      setActionError(err.response?.data?.message || 'Could not change the status.');
+    }
     fetchAppointments();
   };
 
@@ -121,6 +132,25 @@ function Appointments() {
     if (!(await confirm('Cancel this appointment? The time slot will become available again.'))) return;
     await updateStatus(id, 'Cancelled');
   };
+
+  // Confirms the patient came, so the consultation can be billed
+  const checkIn = async (appt) => {
+    setActionError('');
+    setActionMessage('');
+    try {
+      await api.put(`/appointments/${appt.id}/check-in`);
+      setActionMessage(`${getPatientName(appt.patientId)} has been checked in.`);
+    } catch (err) {
+      setActionError(err.response?.data?.message || 'Could not check the patient in.');
+    }
+    fetchAppointments();
+  };
+
+  // Check-in is possible on the day of the appointment or later, until it is confirmed
+  const canCheckIn = (appt) =>
+    !appt.attendanceConfirmed &&
+    appt.status !== 'Cancelled' &&
+    (appt.appointmentDate || '').slice(0, 10) <= todayString();
 
   const getPatientName = (id) => {
     const patient = patients.find((p) => p.id === id);
@@ -149,10 +179,13 @@ function Appointments() {
         <h1>Appointments</h1>
         <p>
           {canBook
-            ? 'Book appointments for patients, reschedule by cancelling and rebooking, and track their status.'
-            : 'See every appointment and its status. Appointments are booked by patients or by reception staff.'}
+            ? 'Book appointments for patients, check them in when they arrive, and track their status. Only patients who are checked in are charged the consultation fee.'
+            : 'See every appointment and its status. Appointments are booked by patients or by reception staff. Only patients who are checked in are charged the consultation fee.'}
         </p>
       </div>
+
+      {actionMessage && <p className="alert alert-success">{actionMessage}</p>}
+      {actionError && <p className="alert alert-error" role="alert">{actionError}</p>}
 
       {canBook && (
         <section className="panel">
@@ -243,7 +276,14 @@ function Appointments() {
           {visiting && (
             <p className="muted" style={{ marginTop: '14px', marginBottom: 0 }}>
               Visiting doctor. Available: {describeSchedule(visiting.schedule)}. The consultation fee of{' '}
-              {formatNaira(visiting.consultationFee)} is billed when the patient checks in.
+              {formatNaira(visiting.consultationFee)} is added to the patient's bill once the patient is checked in.
+            </p>
+          )}
+          {!visiting && selectedDoctor && (
+            <p className="muted" style={{ marginTop: '14px', marginBottom: 0 }}>
+              {selectedDoctor.consultationFee > 0
+                ? `The consultation fee of ${formatNaira(selectedDoctor.consultationFee)} is added to the patient's bill once the patient is checked in.`
+                : 'No consultation fee is set for this doctor yet, so nothing will be billed for this visit.'}
             </p>
           )}
           {error && (
@@ -298,37 +338,59 @@ function Appointments() {
                 <td>{formatDateTime(appt.appointmentDate)}</td>
                 <td>{appt.reason}</td>
                 <td>
-                  <select
-                    className="status-select"
-                    data-status={appt.status}
-                    value={appt.status}
-                    onChange={(e) => updateStatus(appt.id, e.target.value)}
-                    aria-label="Appointment status"
-                  >
-                    <option value="Scheduled">Scheduled</option>
-                    <option value="Completed">Completed</option>
-                    <option value="Cancelled">Cancelled</option>
-                  </select>
+                  {appt.attendanceConfirmed ? (
+                    <>
+                      <span className="badge badge-completed">Completed</span>
+                      <div className="notif-meta">
+                        Checked in{appt.checkedInAt ? ` ${formatDateTime(appt.checkedInAt)}` : ''}
+                      </div>
+                    </>
+                  ) : (
+                    <select
+                      className="status-select"
+                      data-status={appt.status}
+                      value={appt.status}
+                      onChange={(e) => updateStatus(appt.id, e.target.value)}
+                      aria-label="Appointment status"
+                    >
+                      <option value="Scheduled">Scheduled</option>
+                      <option value="Completed">Completed</option>
+                      <option value="Missed">Missed</option>
+                      <option value="Cancelled">Cancelled</option>
+                    </select>
+                  )}
                 </td>
                 <td>
-                  {isAdmin && (
-                    <button
-                      type="button"
-                      className="btn btn-danger btn-sm"
-                      onClick={() => deleteAppointment(appt.id)}
-                    >
-                      Delete
-                    </button>
-                  )}
-                  {canBook && appt.status === 'Scheduled' && (
-                    <button
-                      type="button"
-                      className="btn btn-quiet btn-sm"
-                      onClick={() => cancelAppointment(appt.id)}
-                    >
-                      Cancel
-                    </button>
-                  )}
+                  <div className="row-actions">
+                    {canCheckIn(appt) && (
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        title="Confirm the patient came for this appointment"
+                        onClick={() => checkIn(appt)}
+                      >
+                        Check in
+                      </button>
+                    )}
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        className="btn btn-danger btn-sm"
+                        onClick={() => deleteAppointment(appt.id)}
+                      >
+                        Delete
+                      </button>
+                    )}
+                    {canBook && appt.status === 'Scheduled' && !appt.attendanceConfirmed && (
+                      <button
+                        type="button"
+                        className="btn btn-quiet btn-sm"
+                        onClick={() => cancelAppointment(appt.id)}
+                      >
+                        Cancel
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

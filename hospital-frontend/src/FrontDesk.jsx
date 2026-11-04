@@ -116,13 +116,20 @@ function FrontDesk() {
   const checkInFromAppointment = (appt) => {
     const v = visitingFor(appt.doctorId);
     return act(
-      () =>
-        api.post('/api/frontdesk/check-in', {
+      async () => {
+        await api.post('/api/frontdesk/check-in', {
           type: 'PATIENT',
           personId: appt.patientId,
           appointmentId: appt.id,
           purpose: `Appointment with ${doctorName(appt.doctorId)}`,
-        }),
+        });
+        // Also confirm the visit on the appointment itself, so it is not marked Missed and can be billed
+        try {
+          await api.put(`/appointments/${appt.id}/check-in`);
+        } catch (err) {
+          // Already confirmed, or not applicable: the front desk check-in itself still stands
+        }
+      },
       `${patientName(appt.patientId)} checked in.` +
         (v ? ` A consultation fee bill of ${formatNaira(v.consultationFee)} was created.` : '')
     );
